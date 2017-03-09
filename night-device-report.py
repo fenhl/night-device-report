@@ -20,7 +20,7 @@ def which(cmd):
 
 config = basedir.config_dirs('fenhl/night.json').json()
 device_key = config['deviceKey']
-hostname = platform.node().split('.')[0]
+hostname = config.get('hostname', platform.node().split('.')[0])
 
 data = {}
 
