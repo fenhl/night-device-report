@@ -12,25 +12,18 @@ import platform
 import requests
 import subprocess
 
-def which(cmd):
-    try:
-        return subprocess.check_output(['which', cmd], stderr=subprocess.DEVNULL).decode('utf-8')[:-1]
-    except subprocess.CalledProcessError:
-        return None
-
 config = basedir.config_dirs('fenhl/night.json').json()
 device_key = config['deviceKey']
 hostname = config.get('hostname', platform.node().split('.')[0])
 
 data = {}
 
-if which('needrestart') is not None:
-    for line in subprocess.check_output(['needrestart', '-b'], stderr=subprocess.DEVNULL).decode('utf-8').split('\n'):
-        if line.startswith('NEEDRESTART-KSTA: '):
-            data['needrestart'] = int(line[len('NEEDRESTART-KSTA: '):])
-            break
-    else:
-        data['needrestart'] = None
+for line in subprocess.check_output(['/usr/sbin/needrestart', '-b'], stderr=subprocess.DEVNULL).decode('utf-8').split('\n'):
+    if line.startswith('NEEDRESTART-KSTA: '):
+        data['needrestart'] = int(line[len('NEEDRESTART-KSTA: '):])
+        break
+else:
+    data['needrestart'] = None
 
 response = requests.post('https://v2.nightd.fenhl.net/dev/{}/report'.format(hostname), json={'args': [device_key], 'data': data}, timeout=60.05)
 response.raise_for_status()
