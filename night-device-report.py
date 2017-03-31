@@ -10,6 +10,7 @@ sys.path.append('/opt/py')
 import basedir
 import platform
 import requests
+import shutil
 import subprocess
 
 def night_excepthook(type, value, traceback):
@@ -25,12 +26,22 @@ HOSTNAME = CONFIG.get('hostname', platform.node().split('.')[0])
 
 data = {}
 
+# diskspace
+
+usage = shutil.disk_usage('/')
+data['diskspaceTotal'] = usage.total
+data['diskspaceFree'] = usage.free
+
+# needrestart
+
 for line in subprocess.check_output(['/usr/sbin/needrestart', '-b'], stderr=subprocess.DEVNULL).decode('utf-8').split('\n'):
     if line.startswith('NEEDRESTART-KSTA: '):
         data['needrestart'] = int(line[len('NEEDRESTART-KSTA: '):])
         break
 else:
     data['needrestart'] = None
+
+# send data
 
 response = requests.post('https://v2.nightd.fenhl.net/dev/{}/report'.format(HOSTNAME), json={'args': [DEVICE_KEY], 'data': data}, timeout=60.05)
 response.raise_for_status()
