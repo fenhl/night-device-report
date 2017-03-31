@@ -3,9 +3,11 @@
 if __name__ != '__main__':
     raise ImportError('This module is not for importing!')
 
+import os.path
 import sys
 
 sys.path.append('/opt/py')
+sys.path.append(os.path.expanduser('~/py'))
 
 import basedir
 import platform
