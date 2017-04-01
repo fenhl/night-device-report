@@ -36,11 +36,14 @@ data['diskspaceFree'] = usage.free
 
 # needrestart
 
-for line in subprocess.check_output(['/usr/sbin/needrestart', '-b'], stderr=subprocess.DEVNULL).decode('utf-8').split('\n'):
-    if line.startswith('NEEDRESTART-KSTA: '):
-        data['needrestart'] = int(line[len('NEEDRESTART-KSTA: '):])
-        break
-else:
+try:
+    for line in subprocess.check_output(['/usr/sbin/needrestart', '-b'], stderr=subprocess.DEVNULL).decode('utf-8').split('\n'):
+        if line.startswith('NEEDRESTART-KSTA: '):
+            data['needrestart'] = int(line[len('NEEDRESTART-KSTA: '):])
+            break
+    else:
+        data['needrestart'] = None
+except FileNotFoundError:
     data['needrestart'] = None
 
 # send data
