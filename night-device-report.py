@@ -10,6 +10,7 @@ sys.path.append('/opt/py')
 sys.path.append(os.path.expanduser('~/py'))
 
 import basedir
+import pathlib
 import platform
 import requests
 import shutil
@@ -27,6 +28,17 @@ DEVICE_KEY = CONFIG['deviceKey']
 HOSTNAME = CONFIG.get('hostname', platform.node().split('.')[0])
 
 data = {}
+
+# cron-apt
+
+data['cronApt'] = False
+syslogs = [pathlib.Path('/var/log/syslog.1'), pathlib.Path('/var/log/syslog')]
+for log_path in syslogs:
+    if log_path.exists():
+        with log_path.open() as log_f:
+            if any('cron-apt: CRON-APT RUN' in line for line in log_f):
+                data['cronApt'] = True
+                break
 
 # diskspace
 
