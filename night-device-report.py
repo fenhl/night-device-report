@@ -32,13 +32,20 @@ data = {}
 # cron-apt
 
 data['cronApt'] = False
-syslogs = [pathlib.Path('/var/log/syslog.1'), pathlib.Path('/var/log/syslog')]
+syslogs = [pathlib.Path('/var/log/syslog'), pathlib.Path('/var/log/syslog.1')]
 for log_path in syslogs:
     if log_path.exists():
         with log_path.open() as log_f:
-            if any('cron-apt: CRON-APT RUN' in line for line in log_f):
-                data['cronApt'] = True
-                break
+            for line in reversed(list(log_f)):
+                if 'cron-apt: Download complete and in download only mode' in line:
+                    data['cronApt'] = True
+                    break
+                elif 'cron-apt: 0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.' in line:
+                    data['cronApt'] = False
+                    break
+            else:
+                continue
+            break
 
 # diskspace
 
