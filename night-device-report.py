@@ -27,7 +27,7 @@ CONFIG = basedir.config_dirs('fenhl/night.json').json()
 DEVICE_KEY = CONFIG['deviceKey']
 HOSTNAME = CONFIG.get('hostname', platform.node().split('.')[0])
 
-data = {}
+data = {'key': DEVICE_KEY}
 
 # cron-apt
 
@@ -67,7 +67,7 @@ except FileNotFoundError:
 
 # send data
 
-response = requests.post('https://v3.nightd.fenhl.net/device-report/{}'.format(HOSTNAME), json={'args': [DEVICE_KEY], 'data': data}, timeout=60.05)
+response = requests.post('https://v3.nightd.fenhl.net/device-report/{}'.format(HOSTNAME), json=data, timeout=60.05)
 response.raise_for_status()
 j = response.json()
 if 'text' in j:
