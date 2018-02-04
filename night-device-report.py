@@ -69,6 +69,3 @@ except FileNotFoundError:
 
 response = requests.post('https://v3.nightd.fenhl.net/device-report/{}'.format(HOSTNAME), json=data, timeout=60.05)
 response.raise_for_status()
-j = response.json()
-if 'text' in j:
-    print(j['text'])
