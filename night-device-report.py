@@ -35,12 +35,12 @@ data['cronApt'] = False
 syslogs = [pathlib.Path('/var/log/syslog'), pathlib.Path('/var/log/syslog.1')]
 for log_path in syslogs:
     if log_path.exists():
-        with log_path.open() as log_f:
+        with log_path.open('rb') as log_f:
             for line in reversed(list(log_f)):
-                if 'cron-apt: Download complete and in download only mode' in line:
+                if b'cron-apt: Download complete and in download only mode' in line:
                     data['cronApt'] = True
                     break
-                elif 'cron-apt: 0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.' in line:
+                elif b'cron-apt: 0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.' in line:
                     data['cronApt'] = False
                     break
             else:
