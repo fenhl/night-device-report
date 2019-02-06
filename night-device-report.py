@@ -65,6 +65,13 @@ try:
 except FileNotFoundError:
     data['needrestart'] = None
 
+# oldconffiles
+
+data['oldconffiles'] = {
+    username: pathlib.Path('/home', username, 'oldconffiles').exists()
+    for username in {'fenhl', 'pi'}
+}
+
 # send data
 
 response = requests.post('https://nightd.fenhl.net/device-report/{}'.format(HOSTNAME), json=data, timeout=600)
