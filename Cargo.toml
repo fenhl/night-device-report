@@ -13,8 +13,5 @@ serde_json = "1"
 xdg-basedir = "1"
 wrapped_enum = "*"
 
-[target.'cfg(target_os = "linux")'.dependencies]
-rppal = "*"
-
 [dependencies.systemstat]
 git = "https://github.com/myfreeweb/systemstat"

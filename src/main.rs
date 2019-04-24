@@ -68,30 +68,24 @@ impl Config {
 struct ReportData {
     key: String,
     cron_apt: bool,
-    diskspace_total: usize,
-    diskspace_free: usize,
+    diskspace_total: u64,
+    diskspace_free: u64,
     needrestart: Option<u8>,
     oldconffiles: HashMap<String, bool>
 }
 
-#[cfg(target_os = "linux")]
-fn diskspace() -> Result<(usize, usize), Error> {
-    Ok(if rppal::system::DeviceInfo().is_ok() {
-        // Running on Raspberry Pi, apply workaround for https://github.com/myfreeweb/systemstat/issues/54
-        (
-            String::from_utf8(Command::new("python3").arg("-c").arg("import shutil; print(shutil.disk_usage(\"/\").total)").stdout(Stdio::piped()).output()?.stdout)?.parse()?,
-            String::from_utf8(Command::new("python3").arg("-c").arg("import shutil; print(shutil.disk_usage(\"/\").free)").stdout(Stdio::piped()).output()?.stdout)?.parse()?
-        )
-    } else {
-        let fs = System::new().mount_at("/")?;
-        (fs.total.as_usize(), fs.avail.as_usize())
-    })
+#[cfg(target_pointer_width = "64")]
+fn diskspace() -> Result<(u64, u64), Error> {
+    let fs = System::new().mount_at("/")?;
+    Ok((fs.total.as_usize() as u64, fs.avail.as_usize() as u64))
 }
 
-#[cfg(not(target_os = "linux"))]
-fn diskspace() -> Result<(usize, usize), Error> {
-    let fs = System::new().mount_at("/")?;
-    Ok((fs.total.as_usize(), fs.avail.as_usize()))
+#[cfg(target_pointer_width = "32")]
+fn diskspace() -> Result<(u64, u64), Error> {
+    Ok((
+        String::from_utf8(Command::new("python3").arg("-c").arg("import shutil; print(shutil.disk_usage(\"/\").total)").stdout(Stdio::piped()).output()?.stdout)?.parse()?,
+        String::from_utf8(Command::new("python3").arg("-c").arg("import shutil; print(shutil.disk_usage(\"/\").free)").stdout(Stdio::piped()).output()?.stdout)?.parse()?
+    ))
 }
 
 /// stand-in for `Option::transpose` since it's not stable on Rust 1.32.0
