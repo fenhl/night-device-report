@@ -73,6 +73,15 @@ struct ReportData {
     oldconffiles: HashMap<String, bool>
 }
 
+/// stand-in for `Option::transpose` since it's not stable on Rust 1.32.0
+fn transpose<T, E>(o: Option<Result<T, E>>) -> Result<Option<T>, E> {
+    match o {
+        Some(Ok(v)) => Ok(Some(v)),
+        Some(Err(e)) => Err(e),
+        None => Ok(None)
+    }
+}
+
 fn main() -> Result<(), Error> {
     let config = Config::new()?;
     let fs = System::new().mount_at("/")?;
@@ -99,10 +108,10 @@ fn main() -> Result<(), Error> {
         diskspace_total: fs.total.as_usize(),
         diskspace_free: fs.avail.as_usize(),
         needrestart: {
-            String::from_utf8(Command::new("/usr/sbin/needrestart").arg("-b").stderr(Stdio::null()).output()?.stdout)?.lines()
+            let ksta = String::from_utf8(Command::new("/usr/sbin/needrestart").arg("-b").stderr(Stdio::null()).output()?.stdout)?.lines()
                 .find(|line| line.starts_with("NEEDRESTART-KSTA: "))
-                .map(|line| line["NEEDRESTART-KSTA: ".len()..].parse())
-                .transpose()?
+                .map(|line| line["NEEDRESTART-KSTA: ".len()..].parse());
+            transpose(ksta)?
         },
         oldconffiles: {
             vec!["fenhl", "pi"].into_iter()
