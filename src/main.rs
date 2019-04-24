@@ -82,9 +82,10 @@ fn diskspace() -> Result<(u64, u64), Error> {
 
 #[cfg(target_pointer_width = "32")]
 fn diskspace() -> Result<(u64, u64), Error> {
+    // workaround for https://github.com/myfreeweb/systemstat/issues/54
     Ok((
-        String::from_utf8(Command::new("python3").arg("-c").arg("import shutil; print(shutil.disk_usage(\"/\").total)").stdout(Stdio::piped()).output()?.stdout)?.parse()?,
-        String::from_utf8(Command::new("python3").arg("-c").arg("import shutil; print(shutil.disk_usage(\"/\").free)").stdout(Stdio::piped()).output()?.stdout)?.parse()?
+        String::from_utf8(Command::new("python3").arg("-c").arg("import shutil; print(shutil.disk_usage('/').total)").stdout(Stdio::piped()).output()?.stdout)?.trim().parse()?,
+        String::from_utf8(Command::new("python3").arg("-c").arg("import shutil; print(shutil.disk_usage('/').free)").stdout(Stdio::piped()).output()?.stdout)?.trim().parse()?
     ))
 }
 
