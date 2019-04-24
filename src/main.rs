@@ -74,6 +74,26 @@ struct ReportData {
     oldconffiles: HashMap<String, bool>
 }
 
+#[cfg(target_os = "linux")]
+fn diskspace() -> Result<(usize, usize), Error> {
+    Ok(if rppal::system::DeviceInfo().is_ok() {
+        // Running on Raspberry Pi, apply workaround for https://github.com/myfreeweb/systemstat/issues/54
+        (
+            String::from_utf8(Command::new("python3").arg("-c").arg("import shutil; print(shutil.disk_usage(\"/\").total)").stdout(Stdio::piped()).output()?.stdout)?.parse()?,
+            String::from_utf8(Command::new("python3").arg("-c").arg("import shutil; print(shutil.disk_usage(\"/\").free)").stdout(Stdio::piped()).output()?.stdout)?.parse()?
+        )
+    } else {
+        let fs = System::new().mount_at("/")?;
+        (fs.total.as_usize(), fs.avail.as_usize())
+    })
+}
+
+#[cfg(not(target_os = "linux"))]
+fn diskspace() -> Result<(usize, usize), Error> {
+    let fs = System::new().mount_at("/")?;
+    Ok((fs.total.as_usize(), fs.avail.as_usize()))
+}
+
 /// stand-in for `Option::transpose` since it's not stable on Rust 1.32.0
 fn transpose<T, E>(o: Option<Result<T, E>>) -> Result<Option<T>, E> {
     match o {
@@ -85,7 +105,7 @@ fn transpose<T, E>(o: Option<Result<T, E>>) -> Result<Option<T>, E> {
 
 fn main() -> Result<(), Error> {
     let config = Config::new()?;
-    let fs = System::new().mount_at("/")?;
+    let (diskspace_total, diskspace_free) = diskspace()?;
     let data = ReportData {
         key: config.device_key.clone(),
         cron_apt: {
@@ -106,8 +126,8 @@ fn main() -> Result<(), Error> {
             }
             cron_apt
         },
-        diskspace_total: fs.total.as_usize(),
-        diskspace_free: fs.avail.as_usize(),
+        diskspace_total,
+        diskspace_free,
         needrestart: {
             let ksta = String::from_utf8(Command::new("/usr/sbin/needrestart").arg("-b").stderr(Stdio::null()).output()?.stdout)?.lines()
                 .find(|line| line.starts_with("NEEDRESTART-KSTA: "))
