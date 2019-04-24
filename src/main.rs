@@ -15,6 +15,7 @@ use std::{
     string,
     time::Duration
 };
+use gethostname::gethostname;
 use serde_derive::{
     Deserialize,
     Serialize
@@ -58,7 +59,7 @@ impl Config {
     }
 
     fn hostname(self) -> String {
-        self.hostname.unwrap_or_else(|| unimplemented!()) //TODO
+        self.hostname.unwrap_or_else(|| gethostname().into_string().expect("hostname is invalid UTF-8").split('.').next().expect("hostname is empty").into())
     }
 }
 
