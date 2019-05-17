@@ -47,7 +47,9 @@ wrapped_enum! {
 #[serde(rename_all = "camelCase")]
 struct Config {
     device_key: String,
-    hostname: Option<String>
+    hostname: Option<String>,
+    #[serde(default = "make_true")]
+    root: bool
 }
 
 impl Config {
@@ -89,6 +91,8 @@ fn diskspace() -> Result<(u64, u64), Error> {
     ))
 }
 
+fn make_true() -> bool { true }
+
 /// stand-in for `Option::transpose` since it's not stable on Rust 1.32.0
 fn transpose<T, E>(o: Option<Result<T, E>>) -> Result<Option<T>, E> {
     match o {
@@ -103,7 +107,7 @@ fn main() -> Result<(), Error> {
     let (diskspace_total, diskspace_free) = diskspace()?;
     let data = ReportData {
         key: config.device_key.clone(),
-        cron_apt: {
+        cron_apt: config.root && {
             let mut cron_apt = false;
             let syslogs = vec![Path::new("/var/log/syslog"), Path::new("/var/log/syslog.1")];
             'cron_apt: for log_path in syslogs {
@@ -123,12 +127,12 @@ fn main() -> Result<(), Error> {
         },
         diskspace_total,
         diskspace_free,
-        needrestart: {
+        needrestart: if config.root {
             let ksta = String::from_utf8(Command::new("/usr/sbin/needrestart").arg("-b").stderr(Stdio::null()).output()?.stdout)?.lines()
                 .find(|line| line.starts_with("NEEDRESTART-KSTA: "))
                 .map(|line| line["NEEDRESTART-KSTA: ".len()..].parse());
             transpose(ksta)?
-        },
+        } else { None },
         oldconffiles: {
             vec!["fenhl", "pi"].into_iter()
                 .map(|username| (username.into(), Path::new("/home").join(username).join("oldconffiles").exists()))
