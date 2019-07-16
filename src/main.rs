@@ -1,30 +1,34 @@
-use std::{
-    collections::HashMap,
-    fs::File,
-    io::{
-        self,
-        BufRead,
-        BufReader
+#![deny(rust_2018_idioms, unused, unused_import_braces, unused_qualifications, warnings)]
+
+use {
+    std::{
+        collections::HashMap,
+        fs::File,
+        io::{
+            self,
+            BufRead,
+            BufReader
+        },
+        num::ParseIntError,
+        path::Path,
+        process::{
+            Command,
+            Stdio
+        },
+        string,
+        time::Duration
     },
-    num::ParseIntError,
-    path::Path,
-    process::{
-        Command,
-        Stdio
+    gethostname::gethostname,
+    serde_derive::{
+        Deserialize,
+        Serialize
     },
-    string,
-    time::Duration
+    systemstat::{
+        Platform,
+        System
+    },
+    wrapped_enum::wrapped_enum
 };
-use gethostname::gethostname;
-use serde_derive::{
-    Deserialize,
-    Serialize
-};
-use systemstat::{
-    Platform,
-    System
-};
-use wrapped_enum::wrapped_enum;
 
 #[derive(Debug)]
 enum OtherError {
@@ -76,19 +80,9 @@ struct ReportData {
     oldconffiles: HashMap<String, bool>
 }
 
-#[cfg(target_pointer_width = "64")]
 fn diskspace() -> Result<(u64, u64), Error> {
     let fs = System::new().mount_at("/")?;
-    Ok((fs.total.as_usize() as u64, fs.avail.as_usize() as u64))
-}
-
-#[cfg(target_pointer_width = "32")]
-fn diskspace() -> Result<(u64, u64), Error> {
-    // workaround for https://github.com/myfreeweb/systemstat/issues/54
-    Ok((
-        String::from_utf8(Command::new("python3").arg("-c").arg("import shutil; print(shutil.disk_usage('/').total)").stdout(Stdio::piped()).output()?.stdout)?.trim().parse()?,
-        String::from_utf8(Command::new("python3").arg("-c").arg("import shutil; print(shutil.disk_usage('/').free)").stdout(Stdio::piped()).output()?.stdout)?.trim().parse()?
-    ))
+    Ok((fs.total.as_u64(), fs.avail.as_u64()))
 }
 
 fn make_true() -> bool { true }
