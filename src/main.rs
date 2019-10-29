@@ -18,8 +18,9 @@ use {
         string,
         time::Duration
     },
+    derive_more::From,
     gethostname::gethostname,
-    serde_derive::{
+    serde::{
         Deserialize,
         Serialize
     },
@@ -27,24 +28,16 @@ use {
         Platform,
         System
     },
-    wrapped_enum::wrapped_enum
 };
 
-#[derive(Debug)]
-enum OtherError {
-    MissingConfig
-}
-
-wrapped_enum! {
-    #[derive(Debug)]
-    enum Error {
-        Io(io::Error),
-        Json(serde_json::Error),
-        Other(OtherError),
-        ParseInt(ParseIntError),
-        Reqwest(reqwest::Error),
-        Utf8(string::FromUtf8Error)
-    }
+#[derive(Debug, From)]
+enum Error {
+    Io(io::Error),
+    Json(serde_json::Error),
+    MissingConfig,
+    ParseInt(ParseIntError),
+    Reqwest(reqwest::Error),
+    Utf8(string::FromUtf8Error)
 }
 
 #[derive(Deserialize)]
@@ -60,7 +53,7 @@ impl Config {
     fn new() -> Result<Config, Error> {
         let dirs = xdg_basedir::get_config_home().into_iter().chain(xdg_basedir::get_config_dirs());
         let file = dirs.filter_map(|cfg_dir| File::open(cfg_dir.join("fenhl/night.json")).ok())
-            .next().ok_or(OtherError::MissingConfig)?;
+            .next().ok_or(Error::MissingConfig)?;
         Ok(serde_json::from_reader(file)?)
     }
 
@@ -76,13 +69,10 @@ struct ReportData {
     cron_apt: bool,
     diskspace_total: u64,
     diskspace_free: u64,
+    inodes_total: usize,
+    inodes_free: usize,
     needrestart: Option<u8>,
     oldconffiles: HashMap<String, bool>
-}
-
-fn diskspace() -> Result<(u64, u64), Error> {
-    let fs = System::new().mount_at("/")?;
-    Ok((fs.total.as_u64(), fs.avail.as_u64()))
 }
 
 fn make_true() -> bool { true }
@@ -98,7 +88,7 @@ fn transpose<T, E>(o: Option<Result<T, E>>) -> Result<Option<T>, E> {
 
 fn main() -> Result<(), Error> {
     let config = Config::new()?;
-    let (diskspace_total, diskspace_free) = diskspace()?;
+    let fs = System::new().mount_at("/")?;
     let data = ReportData {
         key: config.device_key.clone(),
         cron_apt: config.root && {
@@ -119,8 +109,10 @@ fn main() -> Result<(), Error> {
             }
             cron_apt
         },
-        diskspace_total,
-        diskspace_free,
+        diskspace_total: fs.total.as_u64(),
+        diskspace_free: fs.avail.as_u64(),
+        inodes_total: fs.files_total,
+        inodes_free: fs.files_avail,
         needrestart: if config.root {
             let ksta = String::from_utf8(Command::new("/usr/sbin/needrestart").arg("-b").stderr(Stdio::null()).output()?.stdout)?.lines()
                 .find(|line| line.starts_with("NEEDRESTART-KSTA: "))

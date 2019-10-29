@@ -5,13 +5,10 @@ authors = ["Fenhl <fenhl@fenhl.net>"]
 edition = "2018"
 
 [dependencies]
-gethostname = "*"
-reqwest = "*"
+derive_more = "0"
+gethostname = "0"
+reqwest = "0"
 serde = "1"
-serde_derive = "1"
 serde_json = "1"
+systemstat = "0"
 xdg-basedir = "1"
-wrapped_enum = "*"
-
-[dependencies.systemstat]
-git = "https://github.com/myfreeweb/systemstat"
