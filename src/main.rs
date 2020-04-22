@@ -27,7 +27,7 @@ use {
     systemstat::{
         Platform,
         System
-    },
+    }
 };
 
 #[derive(Debug, From)]
@@ -125,7 +125,7 @@ fn main() -> Result<(), Error> {
                 .collect()
         }
     };
-    reqwest::Client::builder()
+    reqwest::blocking::Client::builder()
         .timeout(Some(Duration::from_secs(600)))
         .build()?
         .post(&format!("https://nightd.fenhl.net/device-report/{}", config.hostname()))
