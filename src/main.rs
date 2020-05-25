@@ -3,6 +3,7 @@
 use {
     std::{
         collections::HashMap,
+        env,
         fs::File,
         io::{
             self,
@@ -34,7 +35,9 @@ use {
 enum Error {
     Io(io::Error),
     Json(serde_json::Error),
+    MissingCommand,
     MissingConfig,
+    OsString,
     ParseInt(ParseIntError),
     Reqwest(reqwest::Error),
     Utf8(string::FromUtf8Error)
@@ -75,6 +78,13 @@ struct ReportData {
     oldconffiles: HashMap<String, bool>
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CronReport {
+    key: String,
+    status: Option<i32>
+}
+
 fn make_true() -> bool { true }
 
 /// stand-in for `Option::transpose` since it's not stable on Rust 1.32.0
@@ -87,50 +97,67 @@ fn transpose<T, E>(o: Option<Result<T, E>>) -> Result<Option<T>, E> {
 }
 
 fn main() -> Result<(), Error> {
+    let args = env::args_os().skip(1).collect::<Vec<_>>();
     let config = Config::new()?;
-    let fs = System::new().mount_at("/")?;
-    let data = ReportData {
-        key: config.device_key.clone(),
-        cron_apt: config.root && {
-            let mut cron_apt = false;
-            let syslogs = vec![Path::new("/var/log/syslog"), Path::new("/var/log/syslog.1")];
-            'cron_apt: for log_path in syslogs {
-                if log_path.exists() {
-                    let log_f = BufReader::new(File::open(log_path)?);
-                    for line in log_f.lines().filter_map(Result::ok).collect::<Vec<_>>().into_iter().rev() {
-                        if line.contains("cron-apt: Download complete and in download only mode") {
-                            cron_apt = true;
-                            break 'cron_apt;
-                        } else if line.contains("cron-apt: 0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.") {
-                            break 'cron_apt;
+    if let Some((cronjob, args)) = args.split_first() {
+        let (cmd, args) = args.split_first().ok_or(Error::MissingCommand)?;
+        let status = Command::new(cmd).args(args).status()?;
+        let data = CronReport {
+            key: config.device_key.clone(),
+            status: status.code()
+        };
+        reqwest::blocking::Client::builder()
+            .timeout(Some(Duration::from_secs(600)))
+            .build()?
+            .post(&format!("https://nightd.fenhl.net/device-report/{}/{}", config.hostname(), cronjob.to_str().ok_or(Error::OsString)?))
+            .json(&data)
+            .send()?
+            .error_for_status()?;
+    } else {
+        let fs = System::new().mount_at("/")?;
+        let data = ReportData {
+            key: config.device_key.clone(),
+            cron_apt: config.root && {
+                let mut cron_apt = false;
+                let syslogs = vec![Path::new("/var/log/syslog"), Path::new("/var/log/syslog.1")];
+                'cron_apt: for log_path in syslogs {
+                    if log_path.exists() {
+                        let log_f = BufReader::new(File::open(log_path)?);
+                        for line in log_f.lines().filter_map(Result::ok).collect::<Vec<_>>().into_iter().rev() {
+                            if line.contains("cron-apt: Download complete and in download only mode") {
+                                cron_apt = true;
+                                break 'cron_apt;
+                            } else if line.contains("cron-apt: 0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.") {
+                                break 'cron_apt;
+                            }
                         }
                     }
                 }
+                cron_apt
+            },
+            diskspace_total: fs.total.as_u64(),
+            diskspace_free: fs.avail.as_u64(),
+            inodes_total: fs.files_total,
+            inodes_free: fs.files_avail,
+            needrestart: if config.root {
+                let ksta = String::from_utf8(Command::new("/usr/sbin/needrestart").arg("-b").stderr(Stdio::null()).output()?.stdout)?.lines()
+                    .find(|line| line.starts_with("NEEDRESTART-KSTA: "))
+                    .map(|line| line["NEEDRESTART-KSTA: ".len()..].parse());
+                transpose(ksta)?
+            } else { None },
+            oldconffiles: {
+                vec!["fenhl", "pi"].into_iter()
+                    .map(|username| (username.into(), Path::new("/home").join(username).join("oldconffiles").exists()))
+                    .collect()
             }
-            cron_apt
-        },
-        diskspace_total: fs.total.as_u64(),
-        diskspace_free: fs.avail.as_u64(),
-        inodes_total: fs.files_total,
-        inodes_free: fs.files_avail,
-        needrestart: if config.root {
-            let ksta = String::from_utf8(Command::new("/usr/sbin/needrestart").arg("-b").stderr(Stdio::null()).output()?.stdout)?.lines()
-                .find(|line| line.starts_with("NEEDRESTART-KSTA: "))
-                .map(|line| line["NEEDRESTART-KSTA: ".len()..].parse());
-            transpose(ksta)?
-        } else { None },
-        oldconffiles: {
-            vec!["fenhl", "pi"].into_iter()
-                .map(|username| (username.into(), Path::new("/home").join(username).join("oldconffiles").exists()))
-                .collect()
-        }
-    };
-    reqwest::blocking::Client::builder()
-        .timeout(Some(Duration::from_secs(600)))
-        .build()?
-        .post(&format!("https://nightd.fenhl.net/device-report/{}", config.hostname()))
-        .json(&data)
-        .send()?
-        .error_for_status()?;
+        };
+        reqwest::blocking::Client::builder()
+            .timeout(Some(Duration::from_secs(600)))
+            .build()?
+            .post(&format!("https://nightd.fenhl.net/device-report/{}", config.hostname()))
+            .json(&data)
+            .send()?
+            .error_for_status()?;
+    }
     Ok(())
 }
