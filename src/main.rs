@@ -1,46 +1,66 @@
-#![deny(rust_2018_idioms, unused, unused_import_braces, unused_qualifications, warnings)]
+#![deny(rust_2018_idioms, unused, unused_crate_dependencies, unused_import_braces, unused_lifetimes,unused_qualifications, warnings)]
+#![forbid(unsafe_code)]
 
 use {
     std::{
         collections::HashMap,
         env,
+        ffi::OsString,
+        fmt,
         fs::File,
         io::{
             self,
             BufRead,
-            BufReader
+            BufReader,
         },
         num::ParseIntError,
         path::Path,
         process::{
             Command,
-            Stdio
+            Stdio,
         },
         string,
-        time::Duration
+        time::Duration,
     },
     derive_more::From,
     gethostname::gethostname,
     serde::{
         Deserialize,
-        Serialize
+        Serialize,
     },
+    structopt::StructOpt,
     systemstat::{
         Platform,
-        System
-    }
+        System,
+    },
 };
 
 #[derive(Debug, From)]
 enum Error {
     Io(io::Error),
     Json(serde_json::Error),
-    MissingCommand,
     MissingConfig,
-    OsString,
     ParseInt(ParseIntError),
     Reqwest(reqwest::Error),
-    Utf8(string::FromUtf8Error)
+    Utf8(string::FromUtf8Error),
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Error::Io(e) => write!(f, "I/O error: {}", e),
+            Error::Json(e) => write!(f, "JSON error: {}", e),
+            Error::MissingConfig => write!(f, "config file not found"),
+            Error::ParseInt(e) => e.fmt(f),
+            Error::Reqwest(e) => if let Some(url) = e.url() {
+                write!(f, "HTTP error at {}: {}", url, e)
+            } else {
+                write!(f, "HTTP error: {}", e)
+            },
+            Error::Utf8(e) => e.fmt(f),
+        }?;
+        write!(f, "\nerror code: {:?}", self)
+    }
 }
 
 #[derive(Deserialize)]
@@ -49,7 +69,7 @@ struct Config {
     device_key: String,
     hostname: Option<String>,
     #[serde(default = "make_true")]
-    root: bool
+    root: bool,
 }
 
 impl Config {
@@ -75,14 +95,14 @@ struct ReportData {
     inodes_total: usize,
     inodes_free: usize,
     needrestart: Option<u8>,
-    oldconffiles: HashMap<String, bool>
+    oldconffiles: HashMap<String, bool>,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct CronReport {
     key: String,
-    status: Option<i32>
+    status: Option<i32>,
 }
 
 fn make_true() -> bool { true }
@@ -92,26 +112,43 @@ fn transpose<T, E>(o: Option<Result<T, E>>) -> Result<Option<T>, E> {
     match o {
         Some(Ok(v)) => Ok(Some(v)),
         Some(Err(e)) => Err(e),
-        None => Ok(None)
+        None => Ok(None),
     }
 }
 
-fn main() -> Result<(), Error> {
-    let args = env::args_os().skip(1).collect::<Vec<_>>();
+#[derive(StructOpt)]
+struct Args {
+    #[structopt(requires = "cmd")]
+    cronjob: Option<String>,
+    #[structopt(parse(from_os_str))]
+    cmd: Option<OsString>,
+    #[structopt(parse(from_os_str))]
+    args: Vec<OsString>,
+}
+
+#[derive(StructOpt)]
+struct Cronjob {
+}
+
+#[wheel::main]
+async fn main(args: Args) -> Result<(), Error> {
     let config = Config::new()?;
-    if let Some((cronjob, args)) = args.split_first() {
-        let (cmd, args) = args.split_first().ok_or(Error::MissingCommand)?;
-        let status = Command::new(cmd).args(args).status()?;
+    let client = reqwest::Client::builder()
+        .user_agent(concat!("night-device-report/", env!("CARGO_PKG_VERSION")))
+        .timeout(Duration::from_secs(600))
+        //TODO enable http2_prior_knowledge after it's enabled on nightd
+        .use_rustls_tls()
+        .https_only(true)
+        .build()?;
+    if let (Some(cronjob), Some(cmd)) = (args.cronjob, args.cmd) {
+        let status = Command::new(cmd).args(args.args).status()?;
         let data = CronReport {
             key: config.device_key.clone(),
-            status: status.code()
+            status: status.code(),
         };
-        reqwest::blocking::Client::builder()
-            .timeout(Some(Duration::from_secs(600)))
-            .build()?
-            .post(&format!("https://nightd.fenhl.net/device-report/{}/{}", config.hostname(), cronjob.to_str().ok_or(Error::OsString)?))
+        client.post(&format!("https://nightd.fenhl.net/device-report/{}/{}", config.hostname(), cronjob))
             .json(&data)
-            .send()?
+            .send().await?
             .error_for_status()?;
     } else {
         let fs = System::new().mount_at("/")?;
@@ -126,9 +163,9 @@ fn main() -> Result<(), Error> {
                         for line in log_f.lines().filter_map(Result::ok).collect::<Vec<_>>().into_iter().rev() {
                             if line.contains("cron-apt: Download complete and in download only mode") {
                                 cron_apt = true;
-                                break 'cron_apt;
+                                break 'cron_apt
                             } else if line.contains("cron-apt: 0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.") {
-                                break 'cron_apt;
+                                break 'cron_apt
                             }
                         }
                     }
@@ -149,14 +186,11 @@ fn main() -> Result<(), Error> {
                 vec!["fenhl", "pi"].into_iter()
                     .map(|username| (username.into(), Path::new("/home").join(username).join("oldconffiles").exists()))
                     .collect()
-            }
+            },
         };
-        reqwest::blocking::Client::builder()
-            .timeout(Some(Duration::from_secs(600)))
-            .build()?
-            .post(&format!("https://nightd.fenhl.net/device-report/{}", config.hostname()))
+        client.post(&format!("https://nightd.fenhl.net/device-report/{}", config.hostname()))
             .json(&data)
-            .send()?
+            .send().await?
             .error_for_status()?;
     }
     Ok(())
