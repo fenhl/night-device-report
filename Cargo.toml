@@ -16,12 +16,15 @@ warnings = "deny"
 
 [dependencies]
 clap = { version = "4.5.20", features = ["derive"] }
+futures = "0.3.31"
 gethostname = "1"
 if_chain = "1.0.2"
 reqwest = { version = "0.12", features = ["charset", "hickory-dns", "http2", "json", "macos-system-configuration", "rustls-tls"] }
 serde = { version = "1", features = ["derive"] }
 systemstat = "0.2"
 thiserror = "2"
+tokio = { version = "1.45.0", features = ["io-util", "process"] }
+tokio-stream = { version = "0.1.17", features = ["io-util"] }
 wheel = { git = "https://github.com/fenhl/wheel", branch = "main", features = ["serde_json"] }
 
 [target."cfg(windows)".dependencies]

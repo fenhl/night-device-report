@@ -3,21 +3,13 @@ use {
         collections::HashMap,
         env,
         ffi::OsString,
-        fs::File,
-        io::{
-            self,
-            BufRead as _,
-            BufReader,
-        },
         num::ParseIntError,
         path::Path,
-        process::{
-            Command,
-            Stdio,
-        },
+        process::Stdio,
         string,
         time::Duration,
     },
+    futures::stream::TryStreamExt as _,
     gethostname::gethostname,
     if_chain::if_chain,
     serde::{
@@ -28,17 +20,31 @@ use {
         Platform as _,
         System,
     },
-    wheel::fs,
+    tokio::{
+        io::{
+            AsyncBufReadExt as _,
+            BufReader,
+        },
+        process::Command,
+    },
+    tokio_stream::wrappers::LinesStream,
+    wheel::{
+        fs::{
+            self,
+            File,
+        },
+        traits::IoResultExt as _,
+    },
 };
 #[cfg(windows)] use directories::ProjectDirs;
 
 #[derive(Debug, thiserror::Error)]
 enum Error {
     #[error(transparent)] Config(#[from] ConfigError),
-    #[error(transparent)] Io(#[from] io::Error),
     #[error(transparent)] ParseInt(#[from] ParseIntError),
     #[error(transparent)] Reqwest(#[from] reqwest::Error),
     #[error(transparent)] Utf8(#[from] string::FromUtf8Error),
+    #[error(transparent)] Wheel(#[from] wheel::Error),
     #[error("non-UTF-8 string")]
     OsString(OsString),
 }
@@ -139,7 +145,7 @@ async fn main(args: Args) -> Result<(), Error> {
         .https_only(true)
         .build()?;
     if let (Some(cronjob), Some(cmd)) = (args.cronjob, args.cmd) {
-        let status = Command::new(cmd).args(args.args).status()?;
+        let status = Command::new(&cmd).args(args.args).status().await.at_command(cmd.to_string_lossy().into_owned())?;
         let data = CronReport {
             key: config.device_key.clone(),
             status: status.code(),
@@ -149,15 +155,15 @@ async fn main(args: Args) -> Result<(), Error> {
             .send().await?
             .error_for_status()?;
     } else {
-        let fs = System::new().mount_at("/")?;
+        let fs = System::new().mount_at("/").at("/")?;
         let data = ReportData {
             cron_apt: config.root && {
                 let mut cron_apt = false;
                 let syslogs = vec![Path::new("/var/log/syslog"), Path::new("/var/log/syslog.1")];
                 'cron_apt: for log_path in syslogs {
                     if log_path.exists() {
-                        let log_f = BufReader::new(File::open(log_path)?);
-                        for line in log_f.lines().filter_map(Result::ok).collect::<Vec<_>>().into_iter().rev() {
+                        let log_f = BufReader::new(File::open(log_path).await?);
+                        for line in LinesStream::new(log_f.lines()).try_collect::<Vec<_>>().await.at(log_path)?.into_iter().rev() {
                             if line.contains("cron-apt: Download complete and in download only mode") {
                                 cron_apt = true;
                                 break 'cron_apt
@@ -174,7 +180,7 @@ async fn main(args: Args) -> Result<(), Error> {
             inodes_total: fs.files_total,
             inodes_free: fs.files_avail,
             needrestart: if config.root {
-                String::from_utf8(Command::new("sudo").arg("--non-interactive").arg("/usr/sbin/needrestart").arg("-b").stderr(Stdio::null()).output()?.stdout)?.lines()
+                String::from_utf8(Command::new("sudo").arg("--non-interactive").arg("/usr/sbin/needrestart").arg("-b").stderr(Stdio::null()).output().await.at_command("sudo needrestart")?.stdout)?.lines()
                     .find_map(|line| line.strip_prefix("NEEDRESTART-KSTA: "))
                     .map(|line| line.parse())
                     .transpose()?

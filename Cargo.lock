@@ -1210,12 +1210,15 @@ version = "8.0.1"
 dependencies = [
  "clap",
  "directories",
+ "futures",
  "gethostname",
  "if_chain",
  "reqwest",
  "serde",
  "systemstat",
  "thiserror 2.0.12",
+ "tokio",
+ "tokio-stream",
  "wheel",
  "xdg",
 ]
