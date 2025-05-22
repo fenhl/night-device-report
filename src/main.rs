@@ -172,10 +172,19 @@ async fn main(args: Args) -> Result<(), Error> {
             inodes_total: fs.files_total,
             inodes_free: fs.files_avail,
             needrestart: if config.root {
-                String::from_utf8(Command::new("/usr/sbin/needrestart").arg("-b").stderr(Stdio::null()).output().await.at_command("needrestart")?.stdout)?.lines()
-                    .find_map(|line| line.strip_prefix("NEEDRESTART-KSTA: "))
-                    .map(|line| line.parse())
-                    .transpose()?
+                if let os_info::Type::NixOS = os_info::get().os_type() {
+                    // emulate NEEDRESTART-KSTA codes
+                    match Command::new("nixos-needsreboot").status().await.at_command("nixos-needsreboot")?.code() {
+                        Some(0) => Some(1), // no reboot needed
+                        Some(2) => Some(2), // reboot needed //TODO use 3 if it's specifically for a new kernel version (check stderr)
+                        _ => Some(0), // unknown status
+                    }
+                } else {
+                    String::from_utf8(Command::new("/usr/sbin/needrestart").arg("-b").stderr(Stdio::null()).output().await.at_command("needrestart")?.stdout)?.lines()
+                        .find_map(|line| line.strip_prefix("NEEDRESTART-KSTA: "))
+                        .map(|line| line.parse())
+                        .transpose()?
+                }
             } else { None },
             oldconffiles: {
                 ["fenhl", "pi"].into_iter()
