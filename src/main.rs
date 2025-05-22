@@ -1,6 +1,5 @@
 use {
     std::{
-        collections::HashMap,
         env,
         ffi::OsString,
         num::ParseIntError,
@@ -35,6 +34,7 @@ use {
         },
         traits::IoResultExt as _,
     },
+    night_device_report::ReportData,
 };
 #[cfg(windows)] use directories::ProjectDirs;
 
@@ -104,18 +104,6 @@ impl Config {
             }
         })
     }
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ReportData {
-    cron_apt: bool,
-    diskspace_total: u64,
-    diskspace_free: u64,
-    inodes_total: usize,
-    inodes_free: usize,
-    needrestart: Option<u8>,
-    oldconffiles: HashMap<String, bool>,
 }
 
 #[derive(Serialize)]
