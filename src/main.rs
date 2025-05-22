@@ -61,6 +61,7 @@ struct Config {
     device_key: String,
     hostname: Option<String>,
     /// Whether I have root access on this device.
+    /// If `true`, night-device-report assumes it is running as `root`.
     /// If `false`, night-device-report skips checks for system updates which should be handled by root.
     #[serde(default = "make_true")]
     root: bool,
@@ -180,7 +181,7 @@ async fn main(args: Args) -> Result<(), Error> {
             inodes_total: fs.files_total,
             inodes_free: fs.files_avail,
             needrestart: if config.root {
-                String::from_utf8(Command::new("sudo").arg("--non-interactive").arg("/usr/sbin/needrestart").arg("-b").stderr(Stdio::null()).output().await.at_command("sudo needrestart")?.stdout)?.lines()
+                String::from_utf8(Command::new("/usr/sbin/needrestart").arg("-b").stderr(Stdio::null()).output().await.at_command("needrestart")?.stdout)?.lines()
                     .find_map(|line| line.strip_prefix("NEEDRESTART-KSTA: "))
                     .map(|line| line.parse())
                     .transpose()?
