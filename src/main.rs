@@ -146,7 +146,10 @@ async fn main(args: Args) -> Result<(), Error> {
     } else {
         let fs = System::new().mount_at("/").at("/")?;
         let data = ReportData {
-            cron_apt: config.root && {
+            cron_apt: config.root && if let os_info::Type::NixOS = os_info::get().os_type() {
+                false // updates are configured to be installed automatically
+            } else {
+                // not NixOS, assume Debian
                 let mut cron_apt = false;
                 let syslogs = vec![Path::new("/var/log/syslog"), Path::new("/var/log/syslog.1")];
                 'cron_apt: for log_path in syslogs {

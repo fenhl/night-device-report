@@ -24,6 +24,7 @@ clap = { version = "4.5.20", features = ["derive"] }
 futures = "0.3.31"
 gethostname = "1"
 if_chain = "1.0.2"
+os_info = "3.11.0"
 reqwest = { version = "0.12", features = ["charset", "hickory-dns", "http2", "json", "macos-system-configuration", "rustls-tls"] }
 serde = { version = "1", features = ["derive"] }
 systemstat = "0.2"

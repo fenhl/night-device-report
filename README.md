@@ -1,1 +1,1 @@
-`night-device-report` is a script that can be run via a systemd timer (or cronjob) and performs various health checks on Debian-like systems, then reports the results to Night (my private status monitor system). The timer (or cronjob) should be configured to run hourly.
+`night-device-report` is a script that can be run via a systemd timer (or cronjob) and performs various health checks on Debian and NixOS systems, then reports the results to Night (my private status monitor system). The timer (or cronjob) should be configured to run hourly.
