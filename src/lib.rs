@@ -8,7 +8,7 @@ use {
     },
 };
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[cfg_attr(feature = "async-proto", derive(async_proto::Protocol))]
 #[serde(rename_all = "camelCase")]
 pub struct ReportData {
