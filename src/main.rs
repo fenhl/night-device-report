@@ -36,6 +36,7 @@ use {
     },
     night_device_report::ReportData,
 };
+#[cfg(feature = "async-proto")] use async_proto as _; // only used in lib target
 #[cfg(windows)] use directories::ProjectDirs;
 
 #[derive(Debug, thiserror::Error)]
@@ -43,6 +44,7 @@ enum Error {
     #[error(transparent)] Config(#[from] ConfigError),
     #[error(transparent)] ParseInt(#[from] ParseIntError),
     #[error(transparent)] Reqwest(#[from] reqwest::Error),
+    #[error(transparent)] TryFromInt(#[from] std::num::TryFromIntError),
     #[error(transparent)] Utf8(#[from] string::FromUtf8Error),
     #[error(transparent)] Wheel(#[from] wheel::Error),
     #[error("non-UTF-8 string")]
@@ -169,8 +171,8 @@ async fn main(args: Args) -> Result<(), Error> {
             },
             diskspace_total: fs.total.as_u64(),
             diskspace_free: fs.avail.as_u64(),
-            inodes_total: fs.files_total,
-            inodes_free: fs.files_avail,
+            inodes_total: fs.files_total.try_into()?,
+            inodes_free: fs.files_avail.try_into()?,
             needrestart: if config.root {
                 match os_info::get().os_type() { // emulate NEEDRESTART-KSTA codes
                     os_info::Type::Macos => Some(1), // update workflow includes reboot
