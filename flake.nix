@@ -31,12 +31,17 @@
         };
       });
 
-      packages = forEachSupportedSystem ({ pkgs, ... }: {
+      packages = forEachSupportedSystem ({ pkgs, ... }: let
+        manifest = (pkgs.lib.importTOML ./Cargo.toml).package;
+      in {
         default = pkgs.rustPlatform.buildRustPackage {
-          pname = "night-device-report";
-          version = "8.0.1";
+          pname = manifest.name;
+          version = manifest.version;
           src = ./.;
-          cargoLock.lockFile = ./Cargo.lock;
+          cargoLock = {
+            lockFile = ./Cargo.lock;
+            outputHashes."wheel-0.15.0" = "sha256-S5perFWdE8AfKLP7tTIJ3CfbVNyQokvbFxFn3Q6vacA=";
+          };
         };
       });
     };
