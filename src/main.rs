@@ -10,7 +10,6 @@ use {
     },
     futures::stream::TryStreamExt as _,
     gethostname::gethostname,
-    if_chain::if_chain,
     serde::{
         Deserialize,
         Serialize,
@@ -83,14 +82,10 @@ impl Config {
     async fn load() -> Result<Self, ConfigError> {
         #[cfg(unix)] let path = xdg::BaseDirectories::new().find_config_file("fenhl/night.json");
         #[cfg(windows)] let path = Some(ProjectDirs::from("net", "Fenhl", "Night").ok_or(ConfigError::ProjectDirs)?.config_dir().join("config.json"));
-        if_chain! {
-            if let Some(path) = path;
-            if fs::exists(&path).await?; //TODO replace with fs::read_json NotFound error handling
-            then {
-                Ok(fs::read_json(path).await?)
-            } else {
-                Err(ConfigError::Missing)
-            }
+        if let Some(path) = path {
+            Ok(fs::read_json(path).await?)
+        } else {
+            Err(ConfigError::Missing)
         }
     }
 

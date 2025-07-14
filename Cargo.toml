@@ -1,6 +1,6 @@
 [package]
 name = "night-device-report"
-version = "8.0.1"
+version = "8.0.2"
 authors = ["Fenhl <fenhl@fenhl.net>"]
 edition = "2024"
 
@@ -24,7 +24,6 @@ async-proto = { version = "0.25.2", optional = true }
 clap = { version = "4.5.20", features = ["derive"] }
 futures = "0.3.31"
 gethostname = "1"
-if_chain = "1.0.2"
 os_info = "3.11.0"
 reqwest = { version = "0.12", default-features = false, features = ["charset", "hickory-dns", "http2", "json", "macos-system-configuration", "rustls-tls"] }
 serde = { version = "1", features = ["derive"] }
