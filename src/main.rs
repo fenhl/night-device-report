@@ -36,6 +36,7 @@ use {
     night_device_report::ReportData,
 };
 #[cfg(feature = "async-proto")] use async_proto as _; // only used in lib target
+#[cfg(unix)] use std::path::PathBuf;
 #[cfg(windows)] use directories::ProjectDirs;
 
 #[derive(Debug, thiserror::Error)]
@@ -71,8 +72,12 @@ struct Config {
 #[derive(Debug, thiserror::Error)]
 enum ConfigError {
     #[error(transparent)] Wheel(#[from] wheel::Error),
+    #[cfg(unix)]
     #[error("config file not found")]
-    Missing,
+    Missing {
+        config_home: Option<PathBuf>,
+        config_dirs: Vec<PathBuf>,
+    },
     #[cfg(windows)]
     #[error("failed to find project folder")]
     ProjectDirs,
@@ -80,12 +85,20 @@ enum ConfigError {
 
 impl Config {
     async fn load() -> Result<Self, ConfigError> {
-        #[cfg(unix)] let path = xdg::BaseDirectories::new().find_config_file("fenhl/night.json");
-        #[cfg(windows)] let path = Some(ProjectDirs::from("net", "Fenhl", "Night").ok_or(ConfigError::ProjectDirs)?.config_dir().join("config.json"));
-        if let Some(path) = path {
+        #[cfg(unix)] {
+            let base_dirs = xdg::BaseDirectories::new();
+            if let Some(path) = base_dirs.find_config_file("fenhl/night.json") {
+                Ok(fs::read_json(path).await?)
+            } else {
+                Err(ConfigError::Missing {
+                    config_home: base_dirs.get_config_home(),
+                    config_dirs: base_dirs.get_config_dirs(),
+                })
+            }
+        }
+        #[cfg(windows)] {
+            let path = ProjectDirs::from("net", "Fenhl", "Night").ok_or(ConfigError::ProjectDirs)?.config_dir().join("config.json");
             Ok(fs::read_json(path).await?)
-        } else {
-            Err(ConfigError::Missing)
         }
     }
 

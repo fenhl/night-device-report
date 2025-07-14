@@ -40,7 +40,7 @@
           src = ./.;
           cargoLock = {
             lockFile = ./Cargo.lock;
-            outputHashes."wheel-0.15.0" = "sha256-S5perFWdE8AfKLP7tTIJ3CfbVNyQokvbFxFn3Q6vacA=";
+            outputHashes."wheel-0.15.0" = "sha256-K/3qpznJOidF3WK87GWyDajmuUlnrrjDOwqwMUnBly4=";
           };
         };
       });
