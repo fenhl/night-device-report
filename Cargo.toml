@@ -31,7 +31,7 @@ systemstat = "0.2"
 thiserror = "2"
 tokio = { version = "1.45.0", features = ["io-util", "process"] }
 tokio-stream = { version = "0.1.17", features = ["io-util"] }
-wheel = { git = "https://github.com/fenhl/wheel", branch = "main", features = ["serde_json"] }
+wheel = { git = "https://github.com/fenhl/wheel", features = ["serde_json"] }
 
 [target."cfg(windows)".dependencies]
 directories = "6"

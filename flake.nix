@@ -39,8 +39,8 @@
           version = manifest.version;
           src = ./.;
           cargoLock = {
+            allowBuiltinFetchGit = true; # allows omitting cargoLock.outputHashes
             lockFile = ./Cargo.lock;
-            outputHashes."wheel-0.15.0" = "sha256-nNn6Rwnc/6ZLzJdgR2to2xPpgo2mKPMs6dtDHzIbPMc=";
           };
         };
       });
