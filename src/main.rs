@@ -187,7 +187,14 @@ async fn main(args: Args) -> Result<(), Error> {
                     os_info::Type::NixOS => match Command::new("nixos-needsreboot").status().await.at_command("nixos-needsreboot")?.code() {
                         Some(0) => Some(1), // no reboot needed
                         Some(2) => Some(2), // reboot needed //TODO use 3 if it's specifically for a new kernel version (check stderr)
-                        _ => Some(0), // unknown status
+                        code => {
+                            if let Some(code) = code {
+                                eprintln!("nixos-needsreboot exited with status code {code}");
+                            } else {
+                                eprintln!("nixos-needsreboot exited with no status code");
+                            }
+                            Some(0) // unknown status
+                        }
                     },
                     _ => String::from_utf8(Command::new("/usr/sbin/needrestart").arg("-b").stderr(Stdio::null()).output().await.at_command("needrestart")?.stdout)?.lines()
                         .find_map(|line| line.strip_prefix("NEEDRESTART-KSTA: "))
