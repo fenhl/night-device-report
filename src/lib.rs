@@ -20,6 +20,7 @@ use {
     unicode_width::UnicodeWidthStr as _,
     wheel::traits::{
         AsyncCommandOutputExt as _,
+        CommandExt as _,
         IoResultExt as _,
     },
 };
@@ -74,7 +75,7 @@ pub async fn check_cargo_updates() -> Result<Option<(HashMap<String, [Version; 2
         })
     }
 
-    let output = match Command::new("cargo").arg("install-update").arg("--list").arg("--git").check("cargo install-update").await {
+    let output = match Command::new("cargo").arg("install-update").arg("--list").arg("--git").release_create_no_window().check("cargo install-update").await {
         Ok(output) => output,
         Err(wheel::Error::Io { inner, .. }) if inner.kind() == io::ErrorKind::NotFound => return Ok(None), // `cargo` not in PATH
         Err(wheel::Error::CommandExit { output, .. }) if output.status.code().is_some_and(|code| code == 101) => return Ok(None), // `cargo install-update` not installed
