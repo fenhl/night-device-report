@@ -1,3 +1,5 @@
+#![allow(unused_crate_dependencies)] // combined lib/bin crate
+
 use {
     std::{
         env,
@@ -41,6 +43,7 @@ use {
 
 #[derive(Debug, thiserror::Error)]
 enum Error {
+    #[error(transparent)] CargoUpdateCheck(#[from] night_device_report::CargoUpdateCheckError),
     #[error(transparent)] Config(#[from] ConfigError),
     #[error(transparent)] ParseInt(#[from] ParseIntError),
     #[error(transparent)] Reqwest(#[from] reqwest::Error),
@@ -154,6 +157,11 @@ async fn main(args: Args) -> Result<(), Error> {
             .send().await?
             .error_for_status()?;
     } else {
+        let (cargo_updates, cargo_updates_git) = if let Some((cargo_updates, cargo_updates_git)) = night_device_report::check_cargo_updates().await? {
+            (Some(cargo_updates), Some(cargo_updates_git))
+        } else {
+            (None, None)
+        };
         let fs = System::new().mount_at("/").at("/")?;
         let data = ReportData {
             cron_apt: config.root && if let os_info::Type::NixOS = os_info::get().os_type() {
@@ -207,6 +215,7 @@ async fn main(args: Args) -> Result<(), Error> {
                     .map(|username| (username.into(), Path::new("/home").join(username).join("oldconffiles").exists()))
                     .collect()
             },
+            cargo_updates, cargo_updates_git,
         };
         client.post(&format!("https://night.fenhl.net/dev/{}/device-report", config.hostname()?))
             .bearer_auth(&config.device_key)
