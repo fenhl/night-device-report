@@ -129,6 +129,7 @@ struct CronReport {
 fn make_true() -> bool { true }
 
 #[derive(clap::Parser)]
+#[clap(version)]
 struct Args {
     #[clap(requires = "cmd")]
     cronjob: Option<String>,
