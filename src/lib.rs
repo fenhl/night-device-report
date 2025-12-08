@@ -20,10 +20,10 @@ use {
     unicode_width::UnicodeWidthStr as _,
     wheel::traits::{
         AsyncCommandOutputExt as _,
-        CommandExt as _,
         IoResultExt as _,
     },
 };
+#[cfg(windows)] use wheel::traits::CommandExt as _;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[cfg_attr(feature = "async-proto", derive(async_proto::Protocol))]
@@ -75,7 +75,28 @@ pub async fn check_cargo_updates() -> Result<Option<(HashMap<String, [Version; 2
         })
     }
 
-    let output = match Command::new("sudo").arg("-n").arg("-u").arg("fenhl").arg("/home/fenhl/.cargo/bin/cargo").arg("install-update").arg("--list").arg("--git").release_create_no_window().check("cargo install-update").await {
+    let command = {
+        #[cfg(unix)] {
+            let mut cmd = Command::new("sudo");
+            cmd.arg("-n");
+            cmd.arg("-u");
+            cmd.arg("fenhl");
+            cmd.arg("/home/fenhl/.cargo/bin/cargo");
+            cmd.arg("install-update");
+            cmd.arg("--list");
+            cmd.arg("--git");
+            cmd
+        }
+        #[cfg(windows)] {
+            let mut cmd = Command::new("cargo");
+            cmd.arg("install-update");
+            cmd.arg("--list");
+            cmd.arg("--git");
+            cmd.release_create_no_window();
+            cmd
+        }
+    };
+    let output = match command.check("cargo install-update").await {
         Ok(output) => output,
         Err(wheel::Error::Io { inner, .. }) if inner.kind() == io::ErrorKind::NotFound => return Ok(None), // `cargo` not in PATH
         Err(wheel::Error::CommandExit { output, .. }) if output.status.code().is_some_and(|code| code == 101) => return Ok(None), // `cargo install-update` not installed
