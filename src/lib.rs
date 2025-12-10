@@ -145,7 +145,7 @@ pub struct ReportData {
 
 impl ReportData {
     pub async fn new(config: &Config) -> Result<Self, Error> {
-        let (cargo_updates, cargo_updates_git) = if let Some((cargo_updates, cargo_updates_git)) = check_cargo_updates().await? {
+        let (cargo_updates, cargo_updates_git) = if let Some((cargo_updates, cargo_updates_git)) = check_cargo_updates(config.root).await? {
             (Some(cargo_updates), Some(cargo_updates_git))
         } else {
             (None, None)
@@ -225,7 +225,7 @@ pub enum CargoUpdateCheckError {
     VersionPrefix,
 }
 
-pub async fn check_cargo_updates() -> Result<Option<(HashMap<String, [Version; 2]>, HashMap<String, [ObjectId; 2]>)>, CargoUpdateCheckError> {
+pub async fn check_cargo_updates(#[cfg_attr(windows, allow(unused))] root: bool) -> Result<Option<(HashMap<String, [Version; 2]>, HashMap<String, [ObjectId; 2]>)>, CargoUpdateCheckError> {
     fn split_at_width(s: &str, width: usize) -> Result<[&str; 2], CargoUpdateCheckError> {
         let mut idx = s.ceil_char_boundary(width);
         Ok(loop {
@@ -245,11 +245,16 @@ pub async fn check_cargo_updates() -> Result<Option<(HashMap<String, [Version; 2
 
     let command = {
         #[cfg(unix)] {
-            let mut cmd = Command::new("sudo");
-            cmd.arg("-n");
-            cmd.arg("-u");
-            cmd.arg("fenhl");
-            cmd.arg("/home/fenhl/.cargo/bin/cargo");
+            let mut cmd;
+            if root {
+                cmd = Command::new("sudo");
+                cmd.arg("-n");
+                cmd.arg("-u");
+                cmd.arg("fenhl");
+                cmd.arg("/home/fenhl/.cargo/bin/cargo");
+            } else {
+                cmd = Command::new("/home/fenhl/.cargo/bin/cargo");
+            }
             cmd.arg("install-update");
             cmd.arg("--list");
             cmd.arg("--git");
