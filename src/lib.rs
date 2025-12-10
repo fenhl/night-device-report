@@ -257,9 +257,11 @@ pub async fn check_cargo_updates(#[cfg_attr(windows, allow(unused))] root: bool)
                 cmd.arg("-n");
                 cmd.arg("-u");
                 cmd.arg("fenhl");
-                cmd.arg("/home/fenhl/.cargo/bin/cargo");
+                #[cfg(target_os = "macos")] { cmd.arg("/Users/fenhl/.cargo/bin/cargo"); }
+                #[cfg(not(target_os = "macos"))] { cmd.arg("/home/fenhl/.cargo/bin/cargo"); }
             } else {
-                cmd = Command::new("/home/fenhl/.cargo/bin/cargo");
+                #[cfg(target_os = "macos")] { cmd = Command::new("/Users/fenhl/.cargo/bin/cargo"); }
+                #[cfg(not(target_os = "macos"))] { cmd = Command::new("/home/fenhl/.cargo/bin/cargo"); }
             }
             cmd.arg("install-update");
             cmd.arg("--list");
