@@ -177,10 +177,10 @@ impl ReportData {
             diskspace_free: fs.avail.as_u64(),
             inodes_total: fs.files_total.try_into()?,
             inodes_free: fs.files_avail.try_into()?,
-            needrestart: if config.root {
-                match os_info::get().os_type() { // emulate NEEDRESTART-KSTA codes
-                    os_info::Type::Macos => Some(1), // update workflow includes reboot
-                    os_info::Type::NixOS => match Command::new("nixos-needsreboot").status().await.at_command("nixos-needsreboot")?.code() {
+            needrestart: match os_info::get().os_type() { // emulate NEEDRESTART-KSTA codes
+                os_info::Type::Macos => Some(1), // update workflow includes reboot
+                os_info::Type::NixOS => if config.root {
+                    match Command::new("nixos-needsreboot").status().await.at_command("nixos-needsreboot")?.code() {
                         Some(0) => Some(1), // no reboot needed
                         Some(2) => Some(2), // reboot needed //TODO use 3 if it's specifically for a new kernel version (check stderr)
                         code => {
@@ -191,13 +191,19 @@ impl ReportData {
                             }
                             Some(0) // unknown status
                         }
-                    },
-                    _ => String::from_utf8(Command::new("/usr/sbin/needrestart").arg("-b").stderr(Stdio::null()).output().await.at_command("needrestart")?.stdout)?.lines()
+                    }
+                } else {
+                    None
+                },
+                _ => if config.root {
+                    String::from_utf8(Command::new("/usr/sbin/needrestart").arg("-b").stderr(Stdio::null()).output().await.at_command("needrestart")?.stdout)?.lines()
                         .find_map(|line| line.strip_prefix("NEEDRESTART-KSTA: "))
                         .map(|line| line.parse())
-                        .transpose()?,
-                }
-            } else { None },
+                        .transpose()?
+                } else {
+                    None
+                },
+            },
             oldconffiles: {
                 ["fenhl", "pi"].into_iter()
                     .map(|username| (username.into(), Path::new("/home").join(username).join("oldconffiles").exists()))

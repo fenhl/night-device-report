@@ -1375,7 +1375,7 @@ dependencies = [
 
 [[package]]
 name = "night-device-report"
-version = "9.0.6"
+version = "9.0.7"
 dependencies = [
  "async-proto",
  "clap",
