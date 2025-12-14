@@ -146,7 +146,43 @@ pub struct ReportData {
 impl ReportData {
     pub async fn new(config: &Config) -> Result<Self, Error> {
         let (cargo_updates, cargo_updates_git) = if let Some((cargo_updates, cargo_updates_git)) = check_cargo_updates(config.root).await? {
-            (Some(cargo_updates), Some(cargo_updates_git))
+            if !cargo_updates.is_empty() || !cargo_updates_git.is_empty() {
+                let command = {
+                    #[cfg(unix)] {
+                        let mut cmd;
+                        if config.root {
+                            cmd = Command::new("sudo");
+                            cmd.arg("-n");
+                            cmd.arg("-u");
+                            cmd.arg("fenhl");
+                            #[cfg(target_os = "macos")] { cmd.arg("/Users/fenhl/.cargo/bin/cargo"); }
+                            #[cfg(not(target_os = "macos"))] { cmd.arg("/home/fenhl/.cargo/bin/cargo"); }
+                        } else {
+                            #[cfg(target_os = "macos")] { cmd = Command::new("/Users/fenhl/.cargo/bin/cargo"); }
+                            #[cfg(not(target_os = "macos"))] { cmd = Command::new("/home/fenhl/.cargo/bin/cargo"); }
+                        }
+                        cmd.arg("install-update");
+                        cmd.arg("--all");
+                        cmd.arg("--git");
+                        cmd
+                    }
+                    #[cfg(windows)] {
+                        let mut cmd = Command::new("cargo");
+                        cmd.arg("install-update");
+                        cmd.arg("--all");
+                        cmd.arg("--git");
+                        cmd.release_create_no_window();
+                        cmd
+                    }
+                };
+                if command.check("cargo install-update").await.is_ok() {
+                    (Some(HashMap::default()), Some(HashMap::default()))
+                } else {
+                    (Some(cargo_updates), Some(cargo_updates_git))
+                }
+            } else {
+                (Some(cargo_updates), Some(cargo_updates_git))
+            }
         } else {
             (None, None)
         };
