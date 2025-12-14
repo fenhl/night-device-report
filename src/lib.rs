@@ -3,11 +3,8 @@ use {
         cmp::Ordering::*,
         ffi::OsString,
         io::prelude::*,
-        path::Path,
-        process::Stdio,
     },
     clap as _, // only used in bin target
-    futures::stream::TryStreamExt as _,
     gethostname::gethostname,
     gix_hash::ObjectId,
     lazy_regex::regex_captures,
@@ -22,29 +19,37 @@ use {
         System,
     },
     tokio::{
-        io::{
-            self,
-            AsyncBufReadExt as _,
-            BufReader,
-        },
+        io,
         process::Command,
     },
-    tokio_stream::wrappers::LinesStream,
     unicode_width::UnicodeWidthStr as _,
     wheel::{
-        fs::{
-            self,
-            File,
-        },
+        fs,
         traits::{
             AsyncCommandOutputExt as _,
             IoResultExt as _,
         },
     },
 };
-#[cfg(unix)] use std::path::PathBuf;
+#[cfg(unix)] use {
+    std::{
+        path::{
+            Path,
+            PathBuf,
+        },
+        process::Stdio,
+    },
+    futures::stream::TryStreamExt as _,
+    tokio::io::{
+        AsyncBufReadExt as _,
+        BufReader,
+    },
+    tokio_stream::wrappers::LinesStream,
+    wheel::fs::File,
+};
 #[cfg(windows)] use {
     directories::ProjectDirs,
+    itertools::Itertools as _,
     wheel::traits::CommandExt as _,
 };
 
@@ -186,67 +191,86 @@ impl ReportData {
         } else {
             (None, None)
         };
-        let fs = System::new().mount_at("/").at("/")?;
-        Ok(Self {
-            cron_apt: config.root && if let os_info::Type::NixOS = os_info::get().os_type() {
-                false // updates are configured to be installed automatically
-            } else {
-                // not NixOS, assume Debian
-                let mut cron_apt = false;
-                let syslogs = vec![Path::new("/var/log/syslog"), Path::new("/var/log/syslog.1")];
-                'cron_apt: for log_path in syslogs {
-                    if log_path.exists() {
-                        let log_f = BufReader::new(File::open(log_path).await?);
-                        for line in LinesStream::new(log_f.lines()).try_collect::<Vec<_>>().await.at(log_path)?.into_iter().rev() {
-                            if line.contains("cron-apt: Download complete and in download only mode") {
-                                cron_apt = true;
-                                break 'cron_apt
-                            } else if line.contains("cron-apt: 0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.") {
-                                break 'cron_apt
+        #[cfg(unix)] {
+            let fs = System::new().mount_at("/").at("/")?;
+            Ok(Self {
+                cron_apt: config.root && if let os_info::Type::NixOS = os_info::get().os_type() {
+                    false // updates are configured to be installed automatically
+                } else {
+                    // not NixOS, assume Debian
+                    let mut cron_apt = false;
+                    let syslogs = vec![Path::new("/var/log/syslog"), Path::new("/var/log/syslog.1")];
+                    'cron_apt: for log_path in syslogs {
+                        if log_path.exists() {
+                            let log_f = BufReader::new(File::open(log_path).await?);
+                            for line in LinesStream::new(log_f.lines()).try_collect::<Vec<_>>().await.at(log_path)?.into_iter().rev() {
+                                if line.contains("cron-apt: Download complete and in download only mode") {
+                                    cron_apt = true;
+                                    break 'cron_apt
+                                } else if line.contains("cron-apt: 0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.") {
+                                    break 'cron_apt
+                                }
                             }
                         }
                     }
-                }
-                cron_apt
-            },
-            diskspace_total: fs.total.as_u64(),
-            diskspace_free: fs.avail.as_u64(),
-            inodes_total: fs.files_total.try_into()?,
-            inodes_free: fs.files_avail.try_into()?,
-            needrestart: match os_info::get().os_type() { // emulate NEEDRESTART-KSTA codes
-                os_info::Type::Macos => Some(1), // update workflow includes reboot
-                os_info::Type::NixOS => if config.root {
-                    match Command::new("nixos-needsreboot").status().await.at_command("nixos-needsreboot")?.code() {
-                        Some(0) => Some(1), // no reboot needed
-                        Some(2) => Some(2), // reboot needed //TODO use 3 if it's specifically for a new kernel version (check stderr)
-                        code => {
-                            if let Some(code) = code {
-                                eprintln!("nixos-needsreboot exited with status code {code}");
-                            } else {
-                                eprintln!("nixos-needsreboot exited with no status code");
+                    cron_apt
+                },
+                diskspace_total: fs.total.as_u64(),
+                diskspace_free: fs.avail.as_u64(),
+                inodes_total: fs.files_total.try_into()?,
+                inodes_free: fs.files_avail.try_into()?,
+                needrestart: match os_info::get().os_type() { // emulate NEEDRESTART-KSTA codes
+                    os_info::Type::Macos => Some(1), // update workflow includes reboot
+                    os_info::Type::NixOS => if config.root {
+                        match Command::new("nixos-needsreboot").status().await.at_command("nixos-needsreboot")?.code() {
+                            Some(0) => Some(1), // no reboot needed
+                            Some(2) => Some(2), // reboot needed //TODO use 3 if it's specifically for a new kernel version (check stderr)
+                            code => {
+                                if let Some(code) = code {
+                                    eprintln!("nixos-needsreboot exited with status code {code}");
+                                } else {
+                                    eprintln!("nixos-needsreboot exited with no status code");
+                                }
+                                Some(0) // unknown status
                             }
-                            Some(0) // unknown status
                         }
-                    }
-                } else {
-                    None
+                    } else {
+                        None
+                    },
+                    _ => if config.root {
+                        String::from_utf8(Command::new("/usr/sbin/needrestart").arg("-b").stderr(Stdio::null()).output().await.at_command("needrestart")?.stdout)?.lines()
+                            .find_map(|line| line.strip_prefix("NEEDRESTART-KSTA: "))
+                            .map(|line| line.parse())
+                            .transpose()?
+                    } else {
+                        None
+                    },
                 },
-                _ => if config.root {
-                    String::from_utf8(Command::new("/usr/sbin/needrestart").arg("-b").stderr(Stdio::null()).output().await.at_command("needrestart")?.stdout)?.lines()
-                        .find_map(|line| line.strip_prefix("NEEDRESTART-KSTA: "))
-                        .map(|line| line.parse())
-                        .transpose()?
-                } else {
-                    None
+                oldconffiles: {
+                    ["fenhl", "pi"].into_iter()
+                        .map(|username| (username.into(), Path::new("/home").join(username).join("oldconffiles").exists()))
+                        .collect()
                 },
-            },
-            oldconffiles: {
-                ["fenhl", "pi"].into_iter()
-                    .map(|username| (username.into(), Path::new("/home").join(username).join("oldconffiles").exists()))
-                    .collect()
-            },
-            cargo_updates, cargo_updates_git,
-        })
+                cargo_updates, cargo_updates_git,
+            })
+        }
+        #[cfg(windows)] {
+            let sys = System::new();
+            let fs = ["C:\\", "D:\\", "E:\\"].into_iter()
+                .map(|vol| sys.mount_at(vol).at(vol))
+                .process_results(|vols| vols.min_by(|fs1, fs2| (fs1.avail.as_u64() as f64 / fs1.total.as_u64() as f64).total_cmp(&(fs2.avail.as_u64() as f64 / fs2.total.as_u64() as f64))))?
+                .expect("should be nonempty if there was no error");
+            Ok(Self {
+                cron_apt: true, //TODO is it possible to programmatically check if Windows updates are available? Maybe using https://learn.microsoft.com/en-us/windows/win32/wua_sdk/portal-client
+                diskspace_total: fs.total.as_u64(),
+                diskspace_free: fs.avail.as_u64(),
+                inodes_total: fs.files_total.try_into()?,
+                inodes_free: fs.files_avail.try_into()?,
+                needrestart: Some(2), //TODO see cron_apt field; Some(1) for no reboot needed, Some(2) for reboot needed
+                oldconffiles: HashMap::default(),
+                cargo_updates, cargo_updates_git,
+            })
+        }
     }
 }
 

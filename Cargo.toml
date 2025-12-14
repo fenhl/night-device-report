@@ -1,6 +1,6 @@
 [package]
 name = "night-device-report"
-version = "9.0.9"
+version = "9.0.10"
 authors = ["Fenhl <fenhl@fenhl.net>"]
 edition = "2024"
 
@@ -22,23 +22,24 @@ strip = true
 [dependencies]
 async-proto = { version = "0.26", optional = true, features = ["gix-hash", "semver"] }
 clap = { version = "4.5.20", features = ["derive"] }
-futures = "0.3.31"
 gethostname = "1"
 gix-hash = { version = "0.20.1", features = ["serde"] }
 lazy-regex = "3.4.2"
-os_info = "3.11.0"
 reqwest = { version = "0.12", default-features = false, features = ["charset", "hickory-dns", "http2", "json", "macos-system-configuration", "rustls-tls"] }
 semver = { version = "1.0.27", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 systemstat = "0.2"
 thiserror = "2"
 tokio = { version = "1.45.0", features = ["io-util", "process"] }
-tokio-stream = { version = "0.1.17", features = ["io-util"] }
 unicode-width = { version = "0.2.2", default-features = false }
 wheel = { git = "https://github.com/fenhl/wheel", features = ["serde_json"] }
 
 [target."cfg(windows)".dependencies]
 directories = "6"
+itertools = "0.14.0"
 
 [target."cfg(unix)".dependencies]
+futures = "0.3.31"
+os_info = "3.11.0"
+tokio-stream = { version = "0.1.17", features = ["io-util"] }
 xdg = "3"
