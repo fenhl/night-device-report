@@ -86,12 +86,16 @@ impl From<OsString> for Error {
     }
 }
 
+#[cfg(windows)] fn make_c() -> Vec<String> { vec![format!("C:\\")] }
 fn make_true() -> bool { true }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
     pub device_key: String,
+    #[cfg(windows)]
+    #[serde(default = "make_c")]
+    pub file_systems: Vec<String>,
     pub hostname: Option<String>,
     /// Whether I have root access on this device.
     /// If `true`, night-device-report assumes it is running as `root`.
@@ -256,7 +260,7 @@ impl ReportData {
         }
         #[cfg(windows)] {
             let sys = System::new();
-            let fs = ["C:\\", "D:\\", "E:\\"].into_iter()
+            let fs = config.file_systems.iter()
                 .map(|vol| sys.mount_at(vol).at(vol))
                 .process_results(|vols| vols.min_by(|fs1, fs2| (fs1.avail.as_u64() as f64 / fs1.total.as_u64() as f64).total_cmp(&(fs2.avail.as_u64() as f64 / fs2.total.as_u64() as f64))))?
                 .expect("should be nonempty if there was no error");
