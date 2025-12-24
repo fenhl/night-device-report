@@ -23,7 +23,7 @@ strip = true
 async-proto = { version = "0.26", optional = true, features = ["gix-hash", "semver"] }
 clap = { version = "4.5.20", features = ["derive"] }
 gethostname = "1"
-gix-hash = { version = "0.20.1", features = ["serde"] }
+gix-hash = { version = "0.21", features = ["serde"] }
 lazy-regex = "3.4.2"
 reqwest = { version = "0.12", default-features = false, features = ["charset", "hickory-dns", "http2", "json", "macos-system-configuration", "rustls-tls"] }
 semver = { version = "1.0.27", features = ["serde"] }
