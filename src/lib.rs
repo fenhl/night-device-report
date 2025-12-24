@@ -40,6 +40,7 @@ use {
         process::Stdio,
     },
     futures::stream::TryStreamExt as _,
+    lazy_regex::regex_is_match,
     tokio::io::{
         AsyncBufReadExt as _,
         BufReader,
@@ -226,9 +227,11 @@ impl ReportData {
                 needrestart: match os_info::get().os_type() { // emulate NEEDRESTART-KSTA codes
                     os_info::Type::Macos => Some(1), // update workflow includes reboot
                     os_info::Type::NixOS => if config.root {
-                        match Command::new("nixos-needsreboot").status().await.at_command("nixos-needsreboot")?.code() {
+                        let output = Command::new("nixos-needsreboot").output().await.at_command("nixos-needsreboot")?;
+                        match output.status.code() {
                             Some(0) => Some(1), // no reboot needed
                             Some(2) => Some(2), // reboot needed //TODO use 3 if it's specifically for a new kernel version (check stderr)
+                            Some(1) if regex_is_match!("nixos-needsreboot: I/O error at /nix/store/.+/lib/modules: No such file or directory \\(os error 2\\)", &String::from_utf8_lossy(&output.stderr)) => Some(3), // NixOS seems to delete old kernel modules after upgrade
                             code => {
                                 if let Some(code) = code {
                                     eprintln!("nixos-needsreboot exited with status code {code}");
