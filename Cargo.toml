@@ -1,6 +1,6 @@
 [package]
 name = "night-device-report"
-version = "9.0.12"
+version = "9.0.13"
 authors = ["Fenhl <fenhl@fenhl.net>"]
 edition = "2024"
 

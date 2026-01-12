@@ -198,21 +198,22 @@ impl ReportData {
         };
         #[cfg(unix)] {
             let fs = System::new().mount_at("/").at("/")?;
+            //TODO if low on disk space, run cargo sweep (`cargo sweep -ir` on non-NixOS, need to determine toolchains to keep on NixOS)
             Ok(Self {
                 cron_apt: config.root && if let os_info::Type::NixOS = os_info::get().os_type() {
                     false // updates are configured to be installed automatically
                 } else {
                     // not NixOS, assume Debian
-                    let mut cron_apt = false;
+                    let mut cron_apt = true;
                     let syslogs = vec![Path::new("/var/log/syslog"), Path::new("/var/log/syslog.1")];
                     'cron_apt: for log_path in syslogs {
                         if log_path.exists() {
                             let log_f = BufReader::new(File::open(log_path).await?);
                             for line in LinesStream::new(log_f.lines()).try_collect::<Vec<_>>().await.at(log_path)?.into_iter().rev() {
                                 if line.contains("cron-apt: Download complete and in download only mode") {
-                                    cron_apt = true;
                                     break 'cron_apt
                                 } else if line.contains("cron-apt: 0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.") {
+                                    cron_apt = false;
                                     break 'cron_apt
                                 }
                             }
