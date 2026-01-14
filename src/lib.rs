@@ -265,7 +265,7 @@ impl ReportData {
                 },
                 os_version: Some(if let os_info::Type::Debian = os_info.os_type() {
                     // os_info only reports major version, get more accurate version info from file
-                    let [major, minor, patch] = fs::read_to_string("/etc/debian_version").await?.split('.').map(u64::from_str).chain(iter::repeat(Ok(0))).next_array().expect("iter::repeat produces an infinite iterator");
+                    let [major, minor, patch] = fs::read_to_string("/etc/debian_version").await?.trim_end().split('.').map(u64::from_str).chain(iter::repeat(Ok(0))).next_array().expect("iter::repeat produces an infinite iterator");
                     os_info::Version::Semantic(major?, minor?, patch?)
                 } else {
                     os_info.version().clone()
