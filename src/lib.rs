@@ -7,6 +7,7 @@ use {
     clap as _, // only used in bin target
     gethostname::gethostname,
     gix_hash::ObjectId,
+    itertools::Itertools as _,
     lazy_regex::regex_captures,
     std::collections::HashMap,
     semver::Version,
@@ -33,11 +34,13 @@ use {
 };
 #[cfg(unix)] use {
     std::{
+        iter,
         path::{
             Path,
             PathBuf,
         },
         process::Stdio,
+        str::FromStr as _,
     },
     futures::stream::TryStreamExt as _,
     lazy_regex::regex_is_match,
@@ -50,7 +53,6 @@ use {
 };
 #[cfg(windows)] use {
     directories::ProjectDirs,
-    itertools::Itertools as _,
     wheel::traits::CommandExt as _,
 };
 
@@ -261,7 +263,13 @@ impl ReportData {
                         .map(|username| (username.into(), Path::new("/home").join(username).join("oldconffiles").exists()))
                         .collect()
                 },
-                os_version: Some(os_info.version().clone()),
+                os_version: Some(if let os_info::Type::Debian = os_info.os_type() {
+                    // os_info only reports major version, get more accurate version info from file
+                    let [major, minor, patch] = fs::read_to_string("/etc/debian_version").await?.split('.').map(u64::from_str).chain(iter::repeat(Ok(0))).next_array().expect("iter::repeat produces an infinite iterator");
+                    os_info::Version::Semantic(major?, minor?, patch?)
+                } else {
+                    os_info.version().clone()
+                }),
                 cargo_updates, cargo_updates_git,
             })
         }
