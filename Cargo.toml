@@ -1,6 +1,6 @@
 [package]
 name = "night-device-report"
-version = "9.0.13"
+version = "10.0.0"
 authors = ["Fenhl <fenhl@fenhl.net>"]
 edition = "2024"
 
@@ -20,11 +20,12 @@ lto = true
 strip = true
 
 [dependencies]
-async-proto = { version = "0.26", optional = true, features = ["gix-hash", "semver"] }
+async-proto = { version = "0.26", optional = true, features = ["gix-hash", "os_info", "semver"] }
 clap = { version = "4.5.20", features = ["derive"] }
 gethostname = "1"
 gix-hash = { version = "0.21", features = ["serde"] }
 lazy-regex = "3.4.2"
+os_info = "3"
 reqwest = { version = "0.12", default-features = false, features = ["charset", "hickory-dns", "http2", "json", "macos-system-configuration", "rustls-tls"] }
 semver = { version = "1.0.27", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
@@ -40,6 +41,5 @@ itertools = "0.14.0"
 
 [target."cfg(unix)".dependencies]
 futures = "0.3.31"
-os_info = "3.11.0"
 tokio-stream = { version = "0.1.17", features = ["io-util"] }
 xdg = "3"

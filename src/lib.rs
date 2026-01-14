@@ -151,6 +151,7 @@ pub struct ReportData {
     pub inodes_free: u64,
     pub needrestart: Option<u8>,
     pub oldconffiles: HashMap<String, bool>,
+    pub os_version: Option<os_info::Version>,
 }
 
 impl ReportData {
@@ -196,12 +197,13 @@ impl ReportData {
         } else {
             (None, None)
         };
+        let os_info = os_info::get();
         #[cfg(unix)] {
             let fs = System::new().mount_at("/").at("/")?;
             //TODO if low on disk space, run cargo sweep (`cargo sweep -ir` on non-NixOS, need to determine toolchains to keep on NixOS)
             Ok(Self {
-                cron_apt: config.root && if let os_info::Type::NixOS = os_info::get().os_type() {
-                    false // updates are configured to be installed automatically
+                cron_apt: config.root && if let os_info::Type::NixOS = os_info.os_type() {
+                    false // updates are configured to be installed automatically, TODO verify nixos-upgrade.service exited successfully
                 } else {
                     // not NixOS, assume Debian
                     let mut cron_apt = true;
@@ -225,7 +227,7 @@ impl ReportData {
                 diskspace_free: fs.avail.as_u64(),
                 inodes_total: fs.files_total.try_into()?,
                 inodes_free: fs.files_avail.try_into()?,
-                needrestart: match os_info::get().os_type() { // emulate NEEDRESTART-KSTA codes
+                needrestart: match os_info.os_type() { // emulate NEEDRESTART-KSTA codes
                     os_info::Type::Macos => Some(1), // update workflow includes reboot
                     os_info::Type::NixOS => if config.root {
                         let output = Command::new("nixos-needsreboot").output().await.at_command("nixos-needsreboot")?;
@@ -259,6 +261,7 @@ impl ReportData {
                         .map(|username| (username.into(), Path::new("/home").join(username).join("oldconffiles").exists()))
                         .collect()
                 },
+                os_version: Some(os_info.version().clone()),
                 cargo_updates, cargo_updates_git,
             })
         }
@@ -269,13 +272,14 @@ impl ReportData {
                 .process_results(|vols| vols.min_by(|fs1, fs2| (fs1.avail.as_u64() as f64 / fs1.total.as_u64() as f64).total_cmp(&(fs2.avail.as_u64() as f64 / fs2.total.as_u64() as f64))))?
                 .expect("should be nonempty if there was no error");
             Ok(Self {
-                cron_apt: true, //TODO is it possible to programmatically check if Windows updates are available? Maybe using https://learn.microsoft.com/en-us/windows/win32/wua_sdk/portal-client
+                cron_apt: true, // see night-windows-service crate in private night repo for a way to actually check for updates
                 diskspace_total: fs.total.as_u64(),
                 diskspace_free: fs.avail.as_u64(),
                 inodes_total: fs.files_total.try_into()?,
                 inodes_free: fs.files_avail.try_into()?,
                 needrestart: Some(2), //TODO see cron_apt field; Some(1) for no reboot needed, Some(2) for reboot needed
                 oldconffiles: HashMap::default(),
+                os_version: Some(os_info.version().clone()),
                 cargo_updates, cargo_updates_git,
             })
         }
