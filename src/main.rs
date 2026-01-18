@@ -34,6 +34,7 @@ struct Args {
 
 #[wheel::main]
 async fn main(args: Args) -> Result<(), Error> {
+    let _ = rustls::crypto::ring::default_provider().install_default();
     let config = Config::load().await?;
     let client = reqwest::Client::builder()
         .user_agent(concat!("night-device-report/", env!("CARGO_PKG_VERSION")))

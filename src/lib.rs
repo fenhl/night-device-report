@@ -9,6 +9,7 @@ use {
     gix_hash::ObjectId,
     itertools::Itertools as _,
     lazy_regex::regex_captures,
+    rustls as _, // only used in bin target
     std::collections::HashMap,
     semver::Version,
     serde::{

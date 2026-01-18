@@ -27,7 +27,8 @@ gix-hash = { version = "0.21", features = ["serde"] }
 itertools = "0.14"
 lazy-regex = "3.4.2"
 os_info = "3"
-reqwest = { version = "0.12", default-features = false, features = ["charset", "hickory-dns", "http2", "json", "macos-system-configuration", "rustls-tls"] }
+reqwest = { version = "0.13", default-features = false, features = ["charset", "gzip", "hickory-dns", "http2", "json", "rustls-no-provider", "system-proxy", "zstd"] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
 semver = { version = "1.0.27", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 systemstat = "0.2"
