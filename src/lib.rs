@@ -159,8 +159,8 @@ pub struct ReportData {
 
 impl ReportData {
     pub async fn new(config: &Config) -> Result<Self, Error> {
-        let (cargo_updates, cargo_updates_git) = if let Some((cargo_updates, cargo_updates_git)) = check_cargo_updates(config.root).await? {
-            if !cargo_updates.is_empty() || !cargo_updates_git.is_empty() {
+        let (cargo_updates, cargo_updates_git) = match check_cargo_updates(config.root).await {
+            Ok((cargo_updates, cargo_updates_git)) => if !cargo_updates.is_empty() || !cargo_updates_git.is_empty() {
                 let command = {
                     #[cfg(unix)] {
                         let mut cmd;
@@ -196,9 +196,10 @@ impl ReportData {
                 }
             } else {
                 (Some(cargo_updates), Some(cargo_updates_git))
-            }
-        } else {
-            (None, None)
+            },
+            Err(CargoUpdateCheckError::Wheel(wheel::Error::Io { inner, context: wheel::IoErrorContext::Command(cmd) })) if inner.kind() == io::ErrorKind::NotFound && cmd == "cargo install-update" => (None, None), // `cargo` not in PATH
+            Err(CargoUpdateCheckError::Wheel(wheel::Error::CommandExit { name, output })) if name == "cargo install-update" && output.status.code().is_some_and(|code| code == 101) => (None, None), // `cargo install-update` not installed
+            Err(e) => return Err(e.into()),
         };
         let os_info = os_info::get();
         #[cfg(unix)] {
@@ -312,7 +313,7 @@ pub enum CargoUpdateCheckError {
     VersionPrefix,
 }
 
-pub async fn check_cargo_updates(#[cfg_attr(windows, allow(unused))] root: bool) -> Result<Option<(HashMap<String, [Version; 2]>, HashMap<String, [ObjectId; 2]>)>, CargoUpdateCheckError> {
+pub async fn check_cargo_updates(#[cfg_attr(windows, allow(unused))] root: bool) -> Result<(HashMap<String, [Version; 2]>, HashMap<String, [ObjectId; 2]>), CargoUpdateCheckError> {
     fn split_at_width(s: &str, width: usize) -> Result<[&str; 2], CargoUpdateCheckError> {
         let mut idx = s.ceil_char_boundary(width);
         Ok(loop {
@@ -358,12 +359,7 @@ pub async fn check_cargo_updates(#[cfg_attr(windows, allow(unused))] root: bool)
             cmd
         }
     };
-    let output = match command.check("cargo install-update").await {
-        Ok(output) => output,
-        Err(wheel::Error::Io { inner, .. }) if inner.kind() == io::ErrorKind::NotFound => return Ok(None), // `cargo` not in PATH
-        Err(wheel::Error::CommandExit { output, .. }) if output.status.code().is_some_and(|code| code == 101) => return Ok(None), // `cargo install-update` not installed
-        Err(e) => return Err(e.into()),
-    };
+    let output = command.check("cargo install-update").await?;
     let mut lines = BufRead::lines(&*output.stdout);
     let (package_width, installed_width, latest_width) = loop {
         let line = lines.next().ok_or(CargoUpdateCheckError::MissingTableHeader)?.at_command("cargo install-update")?;
@@ -419,5 +415,5 @@ pub async fn check_cargo_updates(#[cfg_attr(windows, allow(unused))] root: bool)
             if cargo_updates_git.insert(package.to_owned(), [installed, latest]).is_some() { return Err(CargoUpdateCheckError::DuplicatePackage) }
         }
     }
-    Ok(Some((cargo_updates, cargo_updates_git)))
+    Ok((cargo_updates, cargo_updates_git))
 }
