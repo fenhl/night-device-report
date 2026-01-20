@@ -159,7 +159,7 @@ pub struct ReportData {
 
 impl ReportData {
     pub async fn new(config: &Config) -> Result<Self, Error> {
-        let (cargo_updates, cargo_updates_git) = match check_cargo_updates(config.root).await {
+        let (cargo_updates, cargo_updates_git) = match check_cargo_updates(config.root, true).await {
             Ok((cargo_updates, cargo_updates_git)) => if !cargo_updates.is_empty() || !cargo_updates_git.is_empty() {
                 let command = {
                     #[cfg(unix)] {
@@ -313,7 +313,7 @@ pub enum CargoUpdateCheckError {
     VersionPrefix,
 }
 
-pub async fn check_cargo_updates(#[cfg_attr(windows, allow(unused))] root: bool) -> Result<(HashMap<String, [Version; 2]>, HashMap<String, [ObjectId; 2]>), CargoUpdateCheckError> {
+pub async fn check_cargo_updates(#[cfg_attr(windows, allow(unused))] root: bool, git: bool) -> Result<(HashMap<String, [Version; 2]>, HashMap<String, [ObjectId; 2]>), CargoUpdateCheckError> {
     fn split_at_width(s: &str, width: usize) -> Result<[&str; 2], CargoUpdateCheckError> {
         let mut idx = s.ceil_char_boundary(width);
         Ok(loop {
@@ -347,14 +347,18 @@ pub async fn check_cargo_updates(#[cfg_attr(windows, allow(unused))] root: bool)
             }
             cmd.arg("install-update");
             cmd.arg("--list");
-            cmd.arg("--git");
+            if git {
+                cmd.arg("--git");
+            }
             cmd
         }
         #[cfg(windows)] {
             let mut cmd = Command::new("cargo");
             cmd.arg("install-update");
             cmd.arg("--list");
-            cmd.arg("--git");
+            if git {
+                cmd.arg("--git");
+            }
             cmd.release_create_no_window();
             cmd
         }
