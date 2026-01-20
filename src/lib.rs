@@ -365,13 +365,13 @@ pub async fn check_cargo_updates(#[cfg_attr(windows, allow(unused))] root: bool,
     };
     let output = command.check("cargo install-update").await?;
     let mut lines = BufRead::lines(&*output.stdout);
+    let mut cargo_updates = HashMap::default();
     let (package_width, installed_width, latest_width) = loop {
         let line = lines.next().ok_or(CargoUpdateCheckError::MissingTableHeader)?.at_command("cargo install-update")?;
         if let Some((_, package, installed, latest)) = regex_captures!("^(Package +)(Installed +)(Latest +)Needs update$", &line) {
             break (package.width(), installed.width(), latest.width())
         }
     };
-    let mut cargo_updates = HashMap::default();
     for line in &mut lines {
         let line = line.at_command("cargo install-update")?;
         if line.is_empty() { break }
@@ -394,29 +394,31 @@ pub async fn check_cargo_updates(#[cfg_attr(windows, allow(unused))] root: bool,
             if cargo_updates.insert(package.to_owned(), [installed, latest]).is_some() { return Err(CargoUpdateCheckError::DuplicatePackage) }
         }
     }
-    let (package_width, installed_width, latest_width) = loop {
-        let line = lines.next().ok_or(CargoUpdateCheckError::MissingTableHeader)?.at_command("cargo install-update")?;
-        if let Some((_, package, installed, latest)) = regex_captures!("^(Package +)(Installed +)(Latest +)Needs update$", &line) {
-            break (package.width(), installed.width(), latest.width())
-        }
-    };
     let mut cargo_updates_git = HashMap::default();
-    for line in lines {
-        let line = line.at_command("cargo install-update")?;
-        if line.is_empty() { break }
-        let [package, rest] = split_at_width(&line, package_width)?;
-        let [installed, rest] = split_at_width(rest, installed_width)?;
-        let [latest, needs_update] = split_at_width(rest, latest_width)?;
-        let package = package.trim_end();
-        let installed = installed.trim_end().parse()?;
-        let latest = latest.trim_end().parse()?;
-        let needs_update = match needs_update {
-            "No" => false,
-            "Yes" => true,
-            _ => return Err(CargoUpdateCheckError::NeedsUpdate),
+    if git {
+        let (package_width, installed_width, latest_width) = loop {
+            let line = lines.next().ok_or(CargoUpdateCheckError::MissingTableHeader)?.at_command("cargo install-update")?;
+            if let Some((_, package, installed, latest)) = regex_captures!("^(Package +)(Installed +)(Latest +)Needs update$", &line) {
+                break (package.width(), installed.width(), latest.width())
+            }
         };
-        if needs_update {
-            if cargo_updates_git.insert(package.to_owned(), [installed, latest]).is_some() { return Err(CargoUpdateCheckError::DuplicatePackage) }
+        for line in lines {
+            let line = line.at_command("cargo install-update")?;
+            if line.is_empty() { break }
+            let [package, rest] = split_at_width(&line, package_width)?;
+            let [installed, rest] = split_at_width(rest, installed_width)?;
+            let [latest, needs_update] = split_at_width(rest, latest_width)?;
+            let package = package.trim_end();
+            let installed = installed.trim_end().parse()?;
+            let latest = latest.trim_end().parse()?;
+            let needs_update = match needs_update {
+                "No" => false,
+                "Yes" => true,
+                _ => return Err(CargoUpdateCheckError::NeedsUpdate),
+            };
+            if needs_update {
+                if cargo_updates_git.insert(package.to_owned(), [installed, latest]).is_some() { return Err(CargoUpdateCheckError::DuplicatePackage) }
+            }
         }
     }
     Ok((cargo_updates, cargo_updates_git))
