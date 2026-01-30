@@ -1,6 +1,6 @@
 [package]
 name = "night-device-report"
-version = "11.0.0"
+version = "11.0.1"
 authors = ["Fenhl <fenhl@fenhl.net>"]
 edition = "2024"
 rust-version = "1.91" # nixpkgs stable

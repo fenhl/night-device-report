@@ -154,7 +154,7 @@ pub struct ReportData {
     pub inodes_free: u64,
     pub needrestart: Option<u8>,
     pub oldconffiles: HashMap<String, bool>,
-    pub os_version: Option<os_info::Version>,
+    pub os_version: os_info::Version,
     pub running_os: os_info::Type,
 }
 
@@ -266,13 +266,13 @@ impl ReportData {
                         .map(|username| (username.into(), Path::new("/home").join(username).join("oldconffiles").exists()))
                         .collect()
                 },
-                os_version: Some(if let os_info::Type::Debian = os_info.os_type() {
+                os_version: if let os_info::Type::Debian = os_info.os_type() {
                     // os_info only reports major version, get more accurate version info from file
                     let [major, minor, patch] = fs::read_to_string("/etc/debian_version").await?.trim_end().split('.').map(u64::from_str).chain(iter::repeat(Ok(0))).next_array().expect("iter::repeat produces an infinite iterator");
                     os_info::Version::Semantic(major?, minor?, patch?)
                 } else {
                     os_info.version().clone()
-                }),
+                },
                 running_os: os_info.os_type(),
                 cargo_updates, cargo_updates_git,
             })
@@ -291,7 +291,8 @@ impl ReportData {
                 inodes_free: fs.files_avail.try_into()?,
                 needrestart: Some(2), //TODO see cron_apt field; Some(1) for no reboot needed, Some(2) for reboot needed
                 oldconffiles: HashMap::default(),
-                os_version: Some(os_info.version().clone()),
+                os_version: os_info.version().clone(),
+                running_os: os_info.os_type(),
                 cargo_updates, cargo_updates_git,
             })
         }
