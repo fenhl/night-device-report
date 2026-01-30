@@ -1,8 +1,9 @@
 [package]
 name = "night-device-report"
-version = "10.0.5"
+version = "11.0.0"
 authors = ["Fenhl <fenhl@fenhl.net>"]
 edition = "2024"
+rust-version = "1.91" # nixpkgs stable
 
 [lints.rust]
 rust_2018_idioms = "deny"

@@ -155,6 +155,7 @@ pub struct ReportData {
     pub needrestart: Option<u8>,
     pub oldconffiles: HashMap<String, bool>,
     pub os_version: Option<os_info::Version>,
+    pub running_os: os_info::Type,
 }
 
 impl ReportData {
@@ -272,6 +273,7 @@ impl ReportData {
                 } else {
                     os_info.version().clone()
                 }),
+                running_os: os_info.os_type(),
                 cargo_updates, cargo_updates_git,
             })
         }
