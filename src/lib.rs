@@ -20,10 +20,7 @@ use {
         Platform as _,
         System,
     },
-    tokio::{
-        io,
-        process::Command,
-    },
+    tokio::process::Command,
     unicode_width::UnicodeWidthStr as _,
     wheel::{
         fs,
@@ -145,6 +142,8 @@ impl Config {
 #[cfg_attr(feature = "async-proto", derive(async_proto::Protocol))]
 #[serde(rename_all = "camelCase")]
 pub struct ReportData {
+    pub cargo_update_check_error_debug: Option<String>,
+    pub cargo_update_check_error_display: Option<String>,
     pub cargo_updates: Option<HashMap<String, [Version; 2]>>,
     pub cargo_updates_git: Option<HashMap<String, [ObjectId; 2]>>,
     pub cron_apt: bool,
@@ -160,7 +159,7 @@ pub struct ReportData {
 
 impl ReportData {
     pub async fn new(config: &Config) -> Result<Self, Error> {
-        let (cargo_updates, cargo_updates_git) = match check_cargo_updates(config.root, true).await {
+        let (cargo_updates, cargo_updates_git, cargo_update_check_error_debug, cargo_update_check_error_display) = match check_cargo_updates(config.root, true).await {
             Ok((cargo_updates, cargo_updates_git)) => if !cargo_updates.is_empty() || !cargo_updates_git.is_empty() {
                 let command = {
                     #[cfg(unix)] {
@@ -191,16 +190,14 @@ impl ReportData {
                     }
                 };
                 if command.check("cargo install-update").await.is_ok() {
-                    (Some(HashMap::default()), Some(HashMap::default()))
+                    (Some(HashMap::default()), Some(HashMap::default()), None, None)
                 } else {
-                    (Some(cargo_updates), Some(cargo_updates_git))
+                    (Some(cargo_updates), Some(cargo_updates_git), None, None)
                 }
             } else {
-                (Some(cargo_updates), Some(cargo_updates_git))
+                (Some(cargo_updates), Some(cargo_updates_git), None, None)
             },
-            Err(CargoUpdateCheckError::Wheel(wheel::Error::Io { inner, context: wheel::IoErrorContext::Command(cmd) })) if inner.kind() == io::ErrorKind::NotFound && cmd == "cargo install-update" => (None, None), // `cargo` not in PATH
-            Err(CargoUpdateCheckError::Wheel(wheel::Error::CommandExit { name, output })) if name == "cargo install-update" && output.status.code().is_some_and(|code| code == 101) => (None, None), // `cargo install-update` not installed
-            Err(e) => return Err(e.into()),
+            Err(e) => (None, None, Some(format!("{e:?}")), Some(e.to_string())),
         };
         let os_info = os_info::get();
         #[cfg(unix)] {
@@ -274,7 +271,7 @@ impl ReportData {
                     os_info.version().clone()
                 },
                 running_os: os_info.os_type(),
-                cargo_updates, cargo_updates_git,
+                cargo_updates, cargo_updates_git, cargo_update_check_error_debug, cargo_update_check_error_display,
             })
         }
         #[cfg(windows)] {
@@ -293,7 +290,7 @@ impl ReportData {
                 oldconffiles: HashMap::default(),
                 os_version: os_info.version().clone(),
                 running_os: os_info.os_type(),
-                cargo_updates, cargo_updates_git,
+                cargo_updates, cargo_updates_git, cargo_update_check_error_debug, cargo_update_check_error_display,
             })
         }
     }
