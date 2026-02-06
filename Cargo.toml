@@ -24,7 +24,7 @@ strip = true
 async-proto = { version = "0.26", optional = true, features = ["gix-hash", "os_info", "semver"] }
 clap = { version = "4.5.20", features = ["derive"] }
 gethostname = "1"
-gix-hash = { version = "0.21", features = ["serde"] }
+gix-hash = { version = "0.22", features = ["serde"] }
 itertools = "0.14"
 lazy-regex = "3.4.2"
 os_info = "3"
