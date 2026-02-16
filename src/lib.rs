@@ -189,10 +189,10 @@ impl ReportData {
                         cmd
                     }
                 };
-                if command.check("cargo install-update").await.is_ok() {
-                    (Some(HashMap::default()), Some(HashMap::default()), None, None)
+                if let Err(e) = command.check("cargo install-update").await {
+                    (Some(cargo_updates), Some(cargo_updates_git), Some(format!("{e:?}")), Some(e.to_string()))
                 } else {
-                    (Some(cargo_updates), Some(cargo_updates_git), None, None)
+                    (Some(HashMap::default()), Some(HashMap::default()), None, None)
                 }
             } else {
                 (Some(cargo_updates), Some(cargo_updates_git), None, None)
