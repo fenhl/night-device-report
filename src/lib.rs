@@ -7,7 +7,6 @@ use {
     clap as _, // only used in bin target
     gethostname::gethostname,
     gix_hash::ObjectId,
-    itertools::Itertools as _,
     lazy_regex::regex_captures,
     rustls as _, // only used in bin target
     std::collections::HashMap,
@@ -15,10 +14,6 @@ use {
     serde::{
         Deserialize,
         Serialize,
-    },
-    systemstat::{
-        Platform as _,
-        System,
     },
     tokio::process::Command,
     unicode_width::UnicodeWidthStr as _,
@@ -52,6 +47,13 @@ use {
 #[cfg(windows)] use {
     directories::ProjectDirs,
     wheel::traits::CommandExt as _,
+};
+#[cfg(feature = "new")] use {
+    itertools::Itertools as _,
+    systemstat::{
+        Platform as _,
+        System,
+    },
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -158,6 +160,7 @@ pub struct ReportData {
 }
 
 impl ReportData {
+    #[cfg(feature = "new")]
     pub async fn new(config: &Config) -> Result<Self, Error> {
         let (cargo_updates, cargo_updates_git, cargo_update_check_error_debug, cargo_update_check_error_display) = match check_cargo_updates(config.root, true).await {
             Ok((cargo_updates, cargo_updates_git)) => if !cargo_updates.is_empty() || !cargo_updates_git.is_empty() {
