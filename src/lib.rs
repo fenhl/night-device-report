@@ -8,6 +8,7 @@ use {
     gethostname::gethostname,
     gix_hash::ObjectId,
     lazy_regex::regex_captures,
+    mimalloc as _, // only used in bin target
     rustls as _, // only used in bin target
     std::collections::HashMap,
     semver::Version,

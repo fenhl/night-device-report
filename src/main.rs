@@ -1,5 +1,8 @@
 #![allow(unused_crate_dependencies)] // combined lib/bin crate
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 use {
     std::{
         env,
