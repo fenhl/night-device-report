@@ -82,6 +82,9 @@ pub enum Error {
     #[error(transparent)] Wheel(#[from] wheel::Error),
     #[error("non-UTF-8 string")]
     OsString(OsString),
+    #[cfg(windows)]
+    #[error("failed to parse JSON from Scoop status")]
+    ScoopJson,
 }
 
 impl From<OsString> for Error {
@@ -158,6 +161,23 @@ pub struct ReportData {
     pub oldconffiles: HashMap<String, bool>,
     pub os_version: os_info::Version,
     pub running_os: os_info::Type,
+    #[serde(default)]
+    pub scoop_updates: Vec<ScoopUpdate>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[cfg_attr(feature = "async-proto", derive(async_proto::Protocol))]
+pub struct ScoopUpdate {
+    #[serde(rename = "Name")]
+    pub name: String,
+    #[serde(rename = "Installed Version")]
+    pub installed_version: Option<String>,
+    #[serde(rename = "Latest Version")]
+    pub latest_version: String,
+    #[serde(rename = "Missing Dependencies")]
+    pub missing_dependencies: String,
+    #[serde(rename = "Info")]
+    pub info: String,
 }
 
 impl ReportData {
@@ -275,6 +295,7 @@ impl ReportData {
                     os_info.version().clone()
                 },
                 running_os: os_info.os_type(),
+                scoop_updates: Vec::default(),
                 cargo_updates, cargo_updates_git, cargo_update_check_error_debug, cargo_update_check_error_display,
             })
         }
@@ -294,6 +315,11 @@ impl ReportData {
                 oldconffiles: HashMap::default(),
                 os_version: os_info.version().clone(),
                 running_os: os_info.os_type(),
+                scoop_updates: {
+                    Command::new("powershell").arg("-Command").arg("scoop update").check("scoop update").await?;
+                    let stdout = Command::new("powershell").arg("-Command").arg("scoop status | ConvertTo-Json").check("scoop status | ConvertTo-Json").await?.stdout;
+                    (0..stdout.len()).find_map(|idx| serde_json::from_slice(&stdout[idx..]).ok()).ok_or(Error::ScoopJson)?
+                },
                 cargo_updates, cargo_updates_git, cargo_update_check_error_debug, cargo_update_check_error_display,
             })
         }
