@@ -29,6 +29,8 @@ struct CronReport {
 #[derive(clap::Parser)]
 #[clap(version)]
 struct Args {
+    #[clap(short, long)]
+    verbose: bool,
     #[clap(requires = "cmd")]
     cronjob: Option<String>,
     cmd: Option<OsString>,
@@ -57,12 +59,14 @@ async fn main(args: Args) -> Result<(), Error> {
             .send().await?
             .error_for_status()?;
     } else {
-        let data = ReportData::new(&config).await?;
+        let data = ReportData::new(&config, args.verbose).await?;
+        if args.verbose { println!("sending report") }
         client.post(&format!("https://night.fenhl.net/dev/{}/device-report", config.hostname()?))
             .bearer_auth(&config.device_key)
             .json(&data)
             .send().await?
             .error_for_status()?;
+        if args.verbose { println!("done") }
     }
     Ok(())
 }

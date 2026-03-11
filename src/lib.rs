@@ -182,7 +182,8 @@ pub struct ScoopUpdate {
 
 impl ReportData {
     #[cfg(feature = "new")]
-    pub async fn new(config: &Config) -> Result<Self, Error> {
+    pub async fn new(config: &Config, verbose: bool) -> Result<Self, Error> {
+        if verbose { println!("checking Cargo updates") }
         let (cargo_updates, cargo_updates_git, cargo_update_check_error_debug, cargo_update_check_error_display) = match check_cargo_updates(config.root, true).await {
             Ok((cargo_updates, cargo_updates_git)) => if !cargo_updates.is_empty() || !cargo_updates_git.is_empty() {
                 let command = {
@@ -213,9 +214,12 @@ impl ReportData {
                         cmd
                     }
                 };
+                if verbose { println!("attempting to install Cargo updates") }
                 if let Err(e) = command.check("cargo install-update").await {
+                    if verbose { println!("installing Cargo updates failed, reporting") }
                     (Some(cargo_updates), Some(cargo_updates_git), Some(format!("{e:?}")), Some(e.to_string()))
                 } else {
+                    if verbose { println!("Cargo updates successfully installed") }
                     (Some(HashMap::default()), Some(HashMap::default()), None, None)
                 }
             } else {
@@ -223,8 +227,10 @@ impl ReportData {
             },
             Err(e) => (None, None, Some(format!("{e:?}")), Some(e.to_string())),
         };
+        if verbose { println!("checking OS info") }
         let os_info = os_info::get();
         #[cfg(unix)] {
+            if verbose { println!("checking file system") }
             let fs = System::new().mount_at("/").at("/")?;
             //TODO if low on disk space, run cargo sweep (`cargo sweep -ir` on non-NixOS, need to determine toolchains to keep on NixOS)
             Ok(Self {
@@ -232,6 +238,7 @@ impl ReportData {
                     false // updates are configured to be installed automatically, TODO verify nixos-upgrade.service exited successfully
                 } else {
                     // not NixOS, assume Debian
+                    if verbose { println!("checking cron-apt logs") }
                     let mut cron_apt = true;
                     let syslogs = vec![Path::new("/var/log/syslog"), Path::new("/var/log/syslog.1")];
                     'cron_apt: for log_path in syslogs {
@@ -256,6 +263,7 @@ impl ReportData {
                 needrestart: match os_info.os_type() { // emulate NEEDRESTART-KSTA codes
                     os_info::Type::Macos => Some(1), // update workflow includes reboot
                     os_info::Type::NixOS => if config.root {
+                        if verbose { println!("checking nixos-needsreboot") }
                         let output = Command::new("nixos-needsreboot").output().await.at_command("nixos-needsreboot")?;
                         match output.status.code() {
                             Some(0) => Some(1), // no reboot needed
@@ -274,6 +282,7 @@ impl ReportData {
                         None
                     },
                     _ => if config.root {
+                        if verbose { println!("checking needrestart") }
                         String::from_utf8(Command::new("/usr/sbin/needrestart").arg("-b").stderr(Stdio::null()).output().await.at_command("needrestart")?.stdout)?.lines()
                             .find_map(|line| line.strip_prefix("NEEDRESTART-KSTA: "))
                             .map(|line| line.parse())
@@ -283,12 +292,14 @@ impl ReportData {
                     },
                 },
                 oldconffiles: {
+                    if verbose { println!("checking oldconffiles") }
                     ["fenhl", "pi"].into_iter()
                         .map(|username| (username.into(), Path::new("/home").join(username).join("oldconffiles").exists()))
                         .collect()
                 },
                 os_version: if let os_info::Type::Debian = os_info.os_type() {
                     // os_info only reports major version, get more accurate version info from file
+                    if verbose { println!("checking Debian version") }
                     let [major, minor, patch] = fs::read_to_string("/etc/debian_version").await?.trim_end().split('.').map(u64::from_str).chain(iter::repeat(Ok(0))).next_array().expect("iter::repeat produces an infinite iterator");
                     os_info::Version::Semantic(major?, minor?, patch?)
                 } else {
@@ -300,6 +311,7 @@ impl ReportData {
             })
         }
         #[cfg(windows)] {
+            if verbose { println!("checking file system") }
             let sys = System::new();
             let fs = config.file_systems.iter()
                 .map(|vol| sys.mount_at(vol).at(vol))
@@ -311,11 +323,12 @@ impl ReportData {
                 diskspace_free: fs.avail.as_u64(),
                 inodes_total: fs.files_total.try_into()?,
                 inodes_free: fs.files_avail.try_into()?,
-                needrestart: Some(2), //TODO see cron_apt field; Some(1) for no reboot needed, Some(2) for reboot needed
+                needrestart: Some(2), // see night-windows-service crate in private night repo for a way to actually check for updates
                 oldconffiles: HashMap::default(),
                 os_version: os_info.version().clone(),
                 running_os: os_info.os_type(),
                 scoop_updates: {
+                    if verbose { println!("checking Scoop updates") }
                     Command::new("powershell").arg("-Command").arg("scoop update").release_create_no_window().check("scoop update").await?;
                     let stdout = Command::new("powershell").arg("-Command").arg("scoop status | ConvertTo-Json").release_create_no_window().check("scoop status | ConvertTo-Json").await?.stdout;
                     (0..stdout.len()).find_map(|idx| serde_json::from_slice(&stdout[idx..]).ok()).ok_or(Error::ScoopJson)?
