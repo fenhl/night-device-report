@@ -23,6 +23,7 @@ use {
         traits::{
             AsyncCommandOutputExt as _,
             IoResultExt as _,
+            IsNetworkError,
         },
     },
 };
@@ -90,6 +91,22 @@ pub enum Error {
 impl From<OsString> for Error {
     fn from(value: OsString) -> Self {
         Self::OsString(value)
+    }
+}
+
+impl IsNetworkError for Error {
+    fn is_network_error(&self) -> bool {
+        match self {
+            Self::CargoUpdateCheck(e) => e.is_network_error(),
+            Self::Config(_) => false,
+            Self::ParseInt(_) => false,
+            Self::Reqwest(e) => e.is_network_error(),
+            Self::TryFromInt(_) => false,
+            Self::Utf8(_) => false,
+            Self::Wheel(e) => e.is_network_error(),
+            Self::OsString(_) => false,
+            #[cfg(windows)] Self::ScoopJson(_) => false,
+        }
     }
 }
 
@@ -354,6 +371,21 @@ pub enum CargoUpdateCheckError {
     SplitAtWidth,
     #[error("missing “v” prefix on version")]
     VersionPrefix,
+}
+
+impl IsNetworkError for CargoUpdateCheckError {
+    fn is_network_error(&self) -> bool {
+        match self {
+            Self::GitHash(_) => false,
+            Self::SemVer(_) => false,
+            Self::Wheel(e) => e.is_network_error(),
+            Self::DuplicatePackage => false,
+            Self::MissingTableHeader => false,
+            Self::NeedsUpdate => false,
+            Self::SplitAtWidth => false,
+            Self::VersionPrefix => false,
+        }
+    }
 }
 
 pub async fn check_cargo_updates(#[cfg_attr(windows, allow(unused))] root: bool, git: bool) -> Result<(HashMap<String, [Version; 2]>, HashMap<String, [ObjectId; 2]>), CargoUpdateCheckError> {
