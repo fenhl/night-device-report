@@ -28,7 +28,7 @@ new = ["dep:itertools", "dep:systemstat"]
 async-proto = { version = "0.26", optional = true, features = ["gix-hash", "os_info", "semver"] }
 clap = { version = "4", features = ["derive"] }
 gethostname = "1"
-gix-hash = { version = "0.22", features = ["serde"] }
+gix-hash = { version = "0.23", features = ["serde", "sha1"] }
 itertools = { version = "0.14", optional = true }
 lazy-regex = "3"
 mimalloc = "0.1"

@@ -114,9 +114,9 @@ dependencies = [
 
 [[package]]
 name = "async-proto"
-version = "0.26.12"
+version = "0.26.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6cdd6101ab7a15f7406bf5427fbe0c00f70f94a0fbcba666837e0576a7ac75e5"
+checksum = "1887d617eec83a013d9e23605af054036c01b9b1a624e5ce8fd6c176194d072d"
 dependencies = [
  "async-proto-derive",
  "byteorder",
@@ -131,9 +131,9 @@ dependencies = [
 
 [[package]]
 name = "async-proto-derive"
-version = "0.26.12"
+version = "0.26.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36ed38e9b6de72b6f8fcd3bda16007a92b7da2525dd4f7d4c4b493ae1c10b466"
+checksum = "4dec03e84a9feb39132c1de7cc1136011ddfce7f72e1761485b3644f87490276"
 dependencies = [
  "itertools",
  "proc-macro2",
@@ -736,9 +736,9 @@ dependencies = [
 
 [[package]]
 name = "gix-hash"
-version = "0.22.1"
+version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8ced05d2d7b13bff08b2f7eb4e47cfeaf00b974c2ddce08377c4fe1f706b3eb"
+checksum = "0fb896a02d9ab96fa518475a5f30ad3952010f801a8de5840f633f4a6b985dfb"
 dependencies = [
  "faster-hex",
  "gix-features",
