@@ -346,7 +346,8 @@ impl ReportData {
                 running_os: os_info.os_type(),
                 scoop_updates: {
                     if verbose { println!("checking Scoop updates") }
-                    Command::new("powershell").arg("-Command").arg("scoop update --all").release_create_no_window().check("scoop update").await?;
+                    Command::new("powershell").arg("-Command").arg("scoop update").release_create_no_window().check("scoop update").await?;
+                    Command::new("powershell").arg("-Command").arg("scoop update --all").release_create_no_window().check("scoop update --all").await?;
                     let stdout = Command::new("powershell").arg("-Command").arg("scoop status | ConvertTo-Json").release_create_no_window().check("scoop status | ConvertTo-Json").await?.stdout;
                     (0..stdout.len()).find_map(|idx| serde_json::from_slice(&stdout[idx..]).ok()).ok_or_else(|| Error::ScoopJson(String::from_utf8_lossy(&stdout).into_owned()))?
                 },
