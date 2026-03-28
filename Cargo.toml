@@ -1,6 +1,6 @@
 [package]
 name = "night-device-report"
-version = "13.0.3"
+version = "13.0.4"
 authors = ["Fenhl <fenhl@fenhl.net>"]
 edition = "2024"
 rust-version = "1.91" # nixpkgs stable
@@ -46,6 +46,7 @@ wheel = { git = "https://github.com/fenhl/wheel", features = ["reqwest", "serde_
 [target."cfg(windows)".dependencies]
 directories = "6"
 serde_json = { package = "serde_json_path_to_error", version = "0.1" }
+serde_with = { version = "3", default-features = false, features = ["alloc"] }
 
 [target."cfg(unix)".dependencies]
 futures = "0.3"
