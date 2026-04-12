@@ -349,13 +349,16 @@ impl ReportData {
                     Command::new("powershell").arg("-Command").arg("scoop update").release_create_no_window().check("scoop update").await?;
                     Command::new("powershell").arg("-Command").arg("scoop update --all").release_create_no_window().check("scoop update --all").await?;
                     let stdout = Command::new("powershell").arg("-Command").arg("scoop status | ConvertTo-Json").release_create_no_window().check("scoop status | ConvertTo-Json").await?.stdout;
-                    if stdout == b"Scoop is up to date.\nEverything is ok!\n" {
-                        Vec::default()
-                    } else {
-                        (0..stdout.len())
+                    match &*stdout {
+                        b"Scoop is up to date.\nEverything is ok!\n" => Vec::default(),
+                        b"WARN  Scoop bucket(s) out of date. Run 'scoop update' to get the latest changes.\n" => {
+                            // updated during report, ignore and handle during next report
+                            Vec::default()
+                        }
+                        _ => (0..stdout.len())
                             .find_map(|idx| serde_json::from_slice::<serde_with::de::DeserializeAsWrap<Vec<ScoopUpdate>, serde_with::OneOrMany<serde_with::Same>>>(&stdout[idx..]).ok())
                             .ok_or_else(|| Error::ScoopJson(String::from_utf8_lossy(&stdout).into_owned()))?
-                            .into_inner()
+                            .into_inner(),
                     }
                 },
                 cargo_updates, cargo_updates_git, cargo_update_check_error_debug, cargo_update_check_error_display,
