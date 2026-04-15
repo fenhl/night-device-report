@@ -37,6 +37,7 @@ use {
         process::Stdio,
         str::FromStr as _,
     },
+    collect_mac::collect,
     futures::stream::TryStreamExt as _,
     lazy_regex::regex_is_match,
     tokio::io::{
@@ -180,6 +181,8 @@ pub struct ReportData {
     pub running_os: os_info::Type,
     #[serde(default)]
     pub scoop_updates: Vec<ScoopUpdate>,
+    #[serde(default)]
+    pub unit_failures: HashMap<String, bool>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -324,6 +327,11 @@ impl ReportData {
                 },
                 running_os: os_info.os_type(),
                 scoop_updates: Vec::default(),
+                unit_failures: if let os_info::Type::NixOS = os_info.os_type() {
+                    collect![format!("nixos-upgrade") => Command::new("systemctl").arg("is-failed").arg("nixos-upgrade.service").status().await.at_command("systemctl")?.success()]
+                } else {
+                    HashMap::default()
+                },
                 cargo_updates, cargo_updates_git, cargo_update_check_error_debug, cargo_update_check_error_display,
             })
         }
@@ -361,6 +369,7 @@ impl ReportData {
                             .into_inner(),
                     }
                 },
+                unit_failures: HashMap::default(),
                 cargo_updates, cargo_updates_git, cargo_update_check_error_debug, cargo_update_check_error_display,
             })
         }
