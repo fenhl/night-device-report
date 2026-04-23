@@ -29,6 +29,7 @@ use {
 };
 #[cfg(unix)] use {
     std::{
+        collections::HashSet,
         iter,
         path::{
             Path,
@@ -127,6 +128,11 @@ pub struct Config {
     /// If `false`, night-device-report skips checks for system updates which should be handled by root.
     #[serde(default = "make_true")]
     pub root: bool,
+    /// systemd units to check for failures
+    ///
+    /// Defaults to `nixos-upgrade.service` on NixOS, empty set otherwise.
+    #[cfg(unix)]
+    pub units: Option<HashSet<String>>,
 }
 
 impl Config {
@@ -327,10 +333,18 @@ impl ReportData {
                 },
                 running_os: os_info.os_type(),
                 scoop_updates: Vec::default(),
-                unit_failures: if let os_info::Type::NixOS = os_info.os_type() {
-                    collect![format!("nixos-upgrade") => Command::new("systemctl").arg("is-failed").arg("nixos-upgrade.service").status().await.at_command("systemctl")?.success()]
-                } else {
-                    HashMap::default()
+                unit_failures: {
+                    let units = config.units.clone().unwrap_or_else(|| if let os_info::Type::NixOS = os_info.os_type() {
+                        collect![format!("nixos-upgrade")]
+                    } else {
+                        HashSet::default()
+                    });
+                    let mut unit_failures = HashMap::default();
+                    for unit in units {
+                        let is_failed = Command::new("systemctl").arg("is-failed").arg(&unit).status().await.at_command("systemctl")?.success();
+                        unit_failures.insert(unit, is_failed);
+                    }
+                    unit_failures
                 },
                 cargo_updates, cargo_updates_git, cargo_update_check_error_debug, cargo_update_check_error_display,
             })
