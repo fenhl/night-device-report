@@ -40,8 +40,8 @@ use {
     },
     collect_mac::collect,
     futures::stream::TryStreamExt as _,
-    lazy_regex::regex_is_match,
     tokio::io::{
+        self,
         AsyncBufReadExt as _,
         BufReader,
     },
@@ -78,6 +78,7 @@ pub enum ConfigError {
 pub enum Error {
     #[error(transparent)] CargoUpdateCheck(#[from] CargoUpdateCheckError),
     #[error(transparent)] Config(#[from] ConfigError),
+    #[cfg(unix)] #[error(transparent)] NixosNeedsReboot(#[from] nixos_needsreboot::Error),
     #[error(transparent)] ParseInt(#[from] std::num::ParseIntError),
     #[error(transparent)] Reqwest(#[from] reqwest::Error),
     #[error(transparent)] TryFromInt(#[from] std::num::TryFromIntError),
@@ -101,6 +102,7 @@ impl IsNetworkError for Error {
         match self {
             Self::CargoUpdateCheck(e) => e.is_network_error(),
             Self::Config(_) => false,
+            #[cfg(unix)] Self::NixosNeedsReboot(_) => false,
             Self::ParseInt(_) => false,
             Self::Reqwest(e) => e.is_network_error(),
             Self::TryFromInt(_) => false,
@@ -290,19 +292,11 @@ impl ReportData {
                     os_info::Type::Macos => Some(1), // update workflow includes reboot
                     os_info::Type::NixOS => if config.root {
                         if verbose { println!("checking nixos-needsreboot") }
-                        let output = Command::new("nixos-needsreboot").output().await.at_command("nixos-needsreboot")?;
-                        match output.status.code() {
-                            Some(0) => Some(1), // no reboot needed
-                            Some(2) => Some(2), // reboot needed //TODO use 3 if it's specifically for a new kernel version (check stderr)
-                            Some(1) if regex_is_match!("nixos-needsreboot: I/O error at /nix/store/.+/lib/modules: No such file or directory \\(os error 2\\)", &String::from_utf8_lossy(&output.stderr)) => Some(3), // NixOS seems to delete old kernel modules after upgrade
-                            code => {
-                                if let Some(code) = code {
-                                    eprintln!("nixos-needsreboot exited with status code {code}");
-                                } else {
-                                    eprintln!("nixos-needsreboot exited with no status code");
-                                }
-                                Some(0) // unknown status
-                            }
+                        match nixos_needsreboot::needs_reboot_async().await {
+                            Ok(nixos_needsreboot::NeedsReboot::IsLatest | nixos_needsreboot::NeedsReboot::NoUpdates) => Some(1), // no reboot needed
+                            Ok(nixos_needsreboot::NeedsReboot::Updates(_ /*reason*/)) => Some(2), // reboot needed //TODO use 3 if it's specifically for a new kernel version (check reason)
+                            Err(nixos_needsreboot::Error::Wheel(wheel::Error::Io { inner, context: wheel::IoErrorContext::Path(path) })) if inner.kind() == io::ErrorKind::NotFound && path.starts_with("/nix/store") && path.ends_with("lib/modules") => Some(3), // NixOS seems to delete old kernel modules after upgrade
+                            Err(e) => return Err(e.into()),
                         }
                     } else {
                         None

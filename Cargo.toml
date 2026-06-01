@@ -51,5 +51,6 @@ serde_with = { version = "3", default-features = false, features = ["alloc"] }
 [target."cfg(unix)".dependencies]
 collect-mac = "0.1"
 futures = "0.3"
+nixos-needsreboot = { git = "https://github.com/fenhl/nixos-needsreboot" }
 tokio-stream = { version = "0.1", features = ["io-util"] }
 xdg = "3"
