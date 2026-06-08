@@ -1,48 +1,30 @@
 {
-  inputs = {
-    # a better way of using the latest stable version of nixpkgs
-    # without specifying specific release
-    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/*.tar.gz";
-  };
-
-  outputs = { self, nixpkgs, ... }:
-    let
-      # helpers for producing system-specific outputs
-      supportedSystems = [
-        "aarch64-linux"
-        "riscv64-linux"
-        "x86_64-linux"
-      ];
-      forEachSupportedSystem = f: nixpkgs.lib.genAttrs supportedSystems (system: f {
-        pkgs = import nixpkgs { inherit system; };
-      });
-    in
-    {
-      devShells = forEachSupportedSystem ({ pkgs, ... }: {
-        default = pkgs.mkShell {
-          packages = with pkgs; [
-            cargo
-            gdb
-            pkg-config
-
-            # formatting this flake
-            nixpkgs-fmt
-          ];
-        };
-      });
-
-      packages = forEachSupportedSystem ({ pkgs, ... }: let
-        manifest = (pkgs.lib.importTOML ./Cargo.toml).package;
-      in {
-        default = pkgs.rustPlatform.buildRustPackage {
-          pname = manifest.name;
-          version = manifest.version;
-          src = ./.;
-          cargoLock = {
-            allowBuiltinFetchGit = true; # allows omitting cargoLock.outputHashes
-            lockFile = ./Cargo.lock;
-          };
-        };
-      });
+    inputs.nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/*.tar.gz";
+    outputs = attrs: let
+        supportedSystems = [
+            "aarch64-darwin"
+            "aarch64-linux"
+            "x86_64-darwin"
+            "x86_64-linux"
+        ];
+        forEachSupportedSystem = f: attrs.nixpkgs.lib.genAttrs supportedSystems (system: f {
+            pkgs = import attrs.nixpkgs {
+                inherit system;
+            };
+        });
+    in {
+        packages = forEachSupportedSystem ({ pkgs, ... }: let
+            manifest = (pkgs.lib.importTOML ./Cargo.toml).package;
+        in {
+            default = pkgs.rustPlatform.buildRustPackage {
+                pname = "night-device-report";
+                version = manifest.version;
+                cargoLock = {
+                    allowBuiltinFetchGit = true; # allows omitting cargoLock.outputHashes
+                    lockFile = ./Cargo.lock;
+                };
+                src = ./.;
+            };
+        });
     };
 }
