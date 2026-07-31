@@ -1,9 +1,9 @@
 [package]
 name = "night-device-report"
-version = "14.1.0"
+version = "14.1.1"
 authors = ["Fenhl <fenhl@fenhl.net>"]
 edition = "2024"
-rust-version = "1.91" # nixpkgs stable
+rust-version = "1.95" # nixpkgs stable
 
 [lints.rust]
 rust_2018_idioms = "deny"
@@ -28,8 +28,8 @@ new = ["dep:itertools", "dep:systemstat"]
 async-proto = { version = "0.26", optional = true, features = ["gix-hash", "os_info", "semver"] }
 clap = { version = "4", features = ["derive"] }
 gethostname = "1"
-gix-hash = { version = "0.25", features = ["serde", "sha1"] }
-itertools = { version = "0.14", optional = true }
+gix-hash = { version = "0.26", features = ["serde", "sha1"] }
+itertools = { version = "0.15", optional = true }
 lazy-regex = "3"
 mimalloc = "0.1"
 os_info = "3"
