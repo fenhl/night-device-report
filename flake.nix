@@ -1,30 +1,16 @@
 {
-    inputs.nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/*.tar.gz";
-    outputs = attrs: let
-        supportedSystems = [
-            "aarch64-darwin"
-            "aarch64-linux"
-            "x86_64-darwin"
-            "x86_64-linux"
-        ];
-        forEachSupportedSystem = f: attrs.nixpkgs.lib.genAttrs supportedSystems (system: f {
-            pkgs = import attrs.nixpkgs {
-                inherit system;
-            };
-        });
-    in {
-        packages = forEachSupportedSystem ({ pkgs, ... }: let
+    inputs.flake.url = "github:fenhl/flake";
+    outputs = attrs: attrs.flake.lib {
+        packages.default = { pkgs, ... }: let
             manifest = (pkgs.lib.importTOML ./Cargo.toml).package;
-        in {
-            default = pkgs.rustPlatform.buildRustPackage {
-                pname = "night-device-report";
-                version = manifest.version;
-                cargoLock = {
-                    allowBuiltinFetchGit = true; # allows omitting cargoLock.outputHashes
-                    lockFile = ./Cargo.lock;
-                };
-                src = ./.;
+        in pkgs.rustPlatform.buildRustPackage {
+            pname = "night-device-report";
+            inherit (manifest) version;
+            cargoLock = {
+                allowBuiltinFetchGit = true; # allows omitting cargoLock.outputHashes
+                lockFile = ./Cargo.lock;
             };
-        });
+            src = ./.;
+        };
     };
 }
