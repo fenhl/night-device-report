@@ -386,7 +386,7 @@ impl ReportData {
 
 #[derive(Debug, thiserror::Error)]
 pub enum CargoUpdateCheckError {
-    #[error(transparent)] GitHash(#[from] gix_hash::decode::Error),
+    #[error(transparent)] GitHash(#[from] gix_error::Exn<gix_error::Message>),
     #[error(transparent)] SemVer(#[from] semver::Error),
     #[error(transparent)] Wheel(#[from] wheel::Error),
     #[error("`cargo install-update` listed multiple packages with the same name")]
