@@ -115,11 +115,15 @@ impl IsNetworkError for Error {
 }
 
 #[cfg(windows)] fn make_c() -> Vec<String> { vec![format!("C:\\")] }
+fn make_false_str() -> String { format!("false") }
 fn make_true() -> bool { true }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
+    /// Program to run to check whether the system may be rebooted automatically when necessary. Defaults to `false`.
+    #[serde(default = "make_false_str")]
+    pub allow_auto_reboot: String,
     pub device_key: String,
     #[cfg(windows)]
     #[serde(default = "make_c")]
@@ -386,7 +390,7 @@ impl ReportData {
 
 #[derive(Debug, thiserror::Error)]
 pub enum CargoUpdateCheckError {
-    #[error(transparent)] GitHash(#[from] gix_error::Exn<gix_error::Message>),
+    #[error(transparent)] GitHash(#[from] gix_error::Error),
     #[error(transparent)] SemVer(#[from] semver::Error),
     #[error(transparent)] Wheel(#[from] wheel::Error),
     #[error("`cargo install-update` listed multiple packages with the same name")]
