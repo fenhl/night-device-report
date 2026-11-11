@@ -4,13 +4,19 @@
         packages.default = { pkgs, ... }: let
             manifest = (pkgs.lib.importTOML ./Cargo.toml).package;
         in pkgs.rustPlatform.buildRustPackage {
-            pname = "night-device-report";
             inherit (manifest) version;
+            pname = "night-device-report";
+            src = ./.;
+            buildInputs = with pkgs; [
+                zstd
+            ];
             cargoLock = {
                 allowBuiltinFetchGit = true; # allows omitting cargoLock.outputHashes
                 lockFile = ./Cargo.lock;
             };
-            src = ./.;
+            nativeBuildInputs = with pkgs; [
+                pkg-config
+            ];
         };
     };
 }
