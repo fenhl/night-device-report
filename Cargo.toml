@@ -22,7 +22,7 @@ strip = true
 
 [features]
 default = ["new"]
-new = ["dep:itertools", "dep:systemstat"]
+new = ["itertools", "systemstat"]
 
 [dependencies]
 async-proto = { version = "0.26", optional = true, features = ["gix-hash", "os_info", "semver"] }

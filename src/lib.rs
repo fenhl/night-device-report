@@ -25,25 +25,9 @@ use {
         traits::IsNetworkError,
     },
 };
-#[cfg(unix)] use {
-    std::{
-        collections::HashSet,
-        iter,
-        path::{
-            Path,
-            PathBuf,
-        },
-        process::Stdio,
-        str::FromStr as _,
-    },
-    collect_mac::collect,
-    futures::stream::TryStreamExt as _,
-    tokio::io::{
-        AsyncBufReadExt as _,
-        BufReader,
-    },
-    tokio_stream::wrappers::LinesStream,
-    wheel::fs::File,
+#[cfg(unix)] use std::{
+    collections::HashSet,
+    path::PathBuf,
 };
 #[cfg(windows)] use {
     directories::ProjectDirs,
@@ -55,6 +39,27 @@ use {
         Platform as _,
         System,
     },
+};
+#[cfg(all(unix, not(feature = "new")))] use {
+    futures as _,
+    collect_mac as _,
+    tokio_stream as _,
+};
+#[cfg(all(unix, feature = "new"))] use {
+    std::{
+        iter,
+        path::Path,
+        process::Stdio,
+        str::FromStr as _,
+    },
+    collect_mac::collect,
+    futures::stream::TryStreamExt as _,
+    tokio::io::{
+        AsyncBufReadExt as _,
+        BufReader,
+    },
+    tokio_stream::wrappers::LinesStream,
+    wheel::fs::File,
 };
 
 #[derive(Debug, thiserror::Error)]
