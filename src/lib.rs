@@ -20,11 +20,9 @@ use {
     unicode_width::UnicodeWidthStr as _,
     wheel::{
         fs,
-        traits::{
-            AsyncCommandOutputExt as _,
-            IoResultExt as _,
-            IsNetworkError,
-        },
+        io::Annotate as _,
+        process::AsyncCommandOutputExt as _,
+        traits::IsNetworkError,
     },
 };
 #[cfg(unix)] use {
@@ -41,7 +39,6 @@ use {
     collect_mac::collect,
     futures::stream::TryStreamExt as _,
     tokio::io::{
-        self,
         AsyncBufReadExt as _,
         BufReader,
     },
@@ -62,7 +59,7 @@ use {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
-    #[error(transparent)] Wheel(#[from] wheel::Error),
+    #[error(transparent)] Json(#[from] fs::JsonError),
     #[cfg(unix)]
     #[error("config file not found")]
     Missing {
@@ -74,43 +71,28 @@ pub enum ConfigError {
     ProjectDirs,
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, IsNetworkError)]
 pub enum Error {
     #[error(transparent)] CargoUpdateCheck(#[from] CargoUpdateCheckError),
-    #[error(transparent)] Config(#[from] ConfigError),
-    #[cfg(unix)] #[error(transparent)] NixosNeedsReboot(#[from] nixos_needsreboot::Error),
-    #[error(transparent)] ParseInt(#[from] std::num::ParseIntError),
+    #[error(transparent)] #[is_network_error = false] Config(#[from] ConfigError),
+    #[error(transparent)] Io(#[from] wheel::io::Error),
+    #[cfg(unix)] #[error(transparent)] #[is_network_error = false] NixosNeedsReboot(#[from] nixos_needsreboot::Error),
+    #[error(transparent)] #[is_network_error = false] ParseInt(#[from] std::num::ParseIntError),
     #[error(transparent)] Reqwest(#[from] reqwest::Error),
-    #[error(transparent)] TryFromInt(#[from] std::num::TryFromIntError),
-    #[error(transparent)] Utf8(#[from] std::string::FromUtf8Error),
-    #[error(transparent)] Wheel(#[from] wheel::Error),
+    #[error(transparent)] #[is_network_error = false] TryFromInt(#[from] std::num::TryFromIntError),
+    #[error(transparent)] #[is_network_error = false] Utf8(#[from] std::string::FromUtf8Error),
     #[error("non-UTF-8 string")]
+    #[is_network_error = false]
     OsString(OsString),
     #[cfg(windows)]
     #[error("failed to parse JSON from Scoop status")]
+    #[is_network_error = false]
     ScoopJson(String),
 }
 
 impl From<OsString> for Error {
     fn from(value: OsString) -> Self {
         Self::OsString(value)
-    }
-}
-
-impl IsNetworkError for Error {
-    fn is_network_error(&self) -> bool {
-        match self {
-            Self::CargoUpdateCheck(e) => e.is_network_error(),
-            Self::Config(_) => false,
-            #[cfg(unix)] Self::NixosNeedsReboot(_) => false,
-            Self::ParseInt(_) => false,
-            Self::Reqwest(e) => e.is_network_error(),
-            Self::TryFromInt(_) => false,
-            Self::Utf8(_) => false,
-            Self::Wheel(e) => e.is_network_error(),
-            Self::OsString(_) => false,
-            #[cfg(windows)] Self::ScoopJson(_) => false,
-        }
     }
 }
 
@@ -299,7 +281,6 @@ impl ReportData {
                         match nixos_needsreboot::needs_reboot_async().await {
                             Ok(nixos_needsreboot::NeedsReboot::IsLatest | nixos_needsreboot::NeedsReboot::NoUpdates) => Some(1), // no reboot needed
                             Ok(nixos_needsreboot::NeedsReboot::Updates(_ /*reason*/)) => Some(2), // reboot needed //TODO use 3 if it's specifically for a new kernel version (check reason)
-                            Err(nixos_needsreboot::Error::Wheel(wheel::Error::Io { inner, context: wheel::IoErrorContext::Path(path) })) if inner.kind() == io::ErrorKind::NotFound && path.starts_with("/nix/store") && path.ends_with("lib/modules") => Some(3), // NixOS seems to delete old kernel modules after upgrade
                             Err(e) => return Err(e.into()),
                         }
                     } else {
@@ -388,11 +369,12 @@ impl ReportData {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, IsNetworkError)]
 pub enum CargoUpdateCheckError {
-    #[error(transparent)] GitHash(#[from] gix_error::Error),
-    #[error(transparent)] SemVer(#[from] semver::Error),
-    #[error(transparent)] Wheel(#[from] wheel::Error),
+    #[error(transparent)] #[is_network_error = false] GitHash(#[from] gix_error::Error),
+    #[error(transparent)] Io(#[from] wheel::io::Error),
+    #[error(transparent)] Process(#[from] wheel::process::Error),
+    #[error(transparent)] #[is_network_error = false] SemVer(#[from] semver::Error),
     #[error("`cargo install-update` listed multiple packages with the same name")]
     DuplicatePackage,
     #[error("no table header in `cargo install-update` output")]
@@ -403,21 +385,6 @@ pub enum CargoUpdateCheckError {
     SplitAtWidth,
     #[error("missing “v” prefix on version")]
     VersionPrefix,
-}
-
-impl IsNetworkError for CargoUpdateCheckError {
-    fn is_network_error(&self) -> bool {
-        match self {
-            Self::GitHash(_) => false,
-            Self::SemVer(_) => false,
-            Self::Wheel(e) => e.is_network_error(),
-            Self::DuplicatePackage => false,
-            Self::MissingTableHeader => false,
-            Self::NeedsUpdate => false,
-            Self::SplitAtWidth => false,
-            Self::VersionPrefix => false,
-        }
-    }
 }
 
 pub async fn check_cargo_updates(#[cfg_attr(windows, allow(unused))] root: bool, git: bool) -> Result<(HashMap<String, [Version; 2]>, HashMap<String, [ObjectId; 2]>), CargoUpdateCheckError> {

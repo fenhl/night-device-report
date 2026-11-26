@@ -11,7 +11,7 @@ use {
     },
     serde::Serialize,
     tokio::process::Command,
-    wheel::traits::IoResultExt as _,
+    wheel::io::Annotate as _,
     night_device_report::{
         Config,
         Error,

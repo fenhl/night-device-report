@@ -29,7 +29,7 @@ async-proto = { version = "0.26", optional = true, features = ["gix-hash", "os_i
 clap = { version = "4", features = ["derive"] }
 gethostname = "1"
 gix-error = "0.5"
-gix-hash = { version = "0.28", features = ["serde", "sha1"] }
+gix-hash = { version = "0.29", features = ["serde", "sha1"] }
 itertools = { version = "0.15", optional = true }
 lazy-regex = "3"
 mimalloc = "0.1"
